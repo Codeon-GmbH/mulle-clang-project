@@ -4313,7 +4313,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
             }
     	    }
       	}
-        // @mulle-objc@ MetaABI: <-
+        // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method (or NULL) <
 
         // Implement swifterror by copying into a new swifterror argument.
         // We'll write back in the normal path out of the call.

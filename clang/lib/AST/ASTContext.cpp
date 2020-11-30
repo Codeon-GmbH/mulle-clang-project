@@ -7095,7 +7095,8 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
       const auto *PT = T->castAs<PointerType>();
       // @mulle-objc@ uniqueid: -> @encode( SEL), @encode( PROTOCOL)
       if (PT->isObjCSelType() || PT->isObjCProtocolType()) {
-        S += ':';  // shouldn't that be ^: ?
+        S += '^';
+        S += ':';
         return;
       }
       // @mulle-objc@ uniqueid: <- @encode( SEL), @encode( PROTOCOL)
@@ -7589,14 +7590,19 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
 }
 
 ObjCInterfaceDecl *ASTContext::getObjCProtocolDecl() const {
-  if (!ObjCProtocolClassDecl) {
-    ObjCProtocolClassDecl
-      = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
-                                  SourceLocation(),
-                                  &Idents.get("Protocol"),
-                                  /*typeParamList=*/nullptr,
-                                  /*PrevDecl=*/nullptr,
-                                  SourceLocation(), true);
+   if (!ObjCProtocolClassDecl) {
+     ObjCProtocolClassDecl
+       = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
+                                   SourceLocation(),
+                                   &Idents.get("Protocol"),
+                                   /*typeParamList=*/nullptr,
+                                   /*PrevDecl=*/nullptr,
+                                   SourceLocation(), true);
+   }
+
+   return ObjCProtocolClassDecl;
+}
+
 /// @mulle-objc@ uniqueid: change type of PROTOCOL to pointer >
 /// INCOMPATIBLE!
 TypedefDecl *ASTContext::getObjCPROTOCOLDecl() const {

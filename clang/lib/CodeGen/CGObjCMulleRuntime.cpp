@@ -111,8 +111,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         case 3  : name = "mulle_objc_object_inlinecall"; break;
-         default : name = "mulle_objc_object_partialinlinecall"; break;
+         case 3  : name = "mulle_objc_object_call_inline"; break;
+         default : name = "mulle_objc_object_call_partialinline"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -136,8 +136,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         case 3  : name = "mulle_objc_object_inlinecall"; break;
-         default : name = "mulle_objc_object_partialinlinecall"; break;
+         case 3  : name = "mulle_objc_object_call_inline"; break;
+         default : name = "mulle_objc_object_call_partialinline"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -165,21 +165,21 @@ namespace {
          llvm::Type *params[] = { ObjectPtrTy, Int8PtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_infraclass_allocwithzone_instance");
+                                          "_mulle_objc_infraclass_alloc_instance_zone");
       }
 
       llvm::FunctionCallee getMessageSendRetainFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
-                                          "mulle_objc_object_inlineretain");
+                                          "mulle_objc_object_retain_inline");
       }
 
       llvm::FunctionCallee getMessageSendReleaseFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
                                                                   params, false),
-                                          "mulle_objc_object_inlinerelease");
+                                          "mulle_objc_object_release_inline");
       }
 
       // improve legacy code to basically a no-op
@@ -200,10 +200,10 @@ namespace {
          StringRef    name;
          switch( optLevel)
          {
-         case 3  : name = "_mulle_objc_object_inlinesupercall"; break;
-         default : name = "_mulle_objc_object_partialinlinesupercall"; break;
+         case 3  : name = "mulle_objc_object_supercall_inline"; break;
+         default : name = "mulle_objc_object_supercall_partialinline"; break;
          case -1 :
-         case 0  : name = "_mulle_objc_object_supercall"; break;
+         case 0  : name = "mulle_objc_object_supercall"; break;
          }
 
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, SuperIDTy  };
@@ -1744,10 +1744,10 @@ struct mulle_clang_objccompilerinfo  *CGObjCMulleRuntime::getMulleObjCRuntimeInf
    // {
    //    unsigned int   load_version;
    //    unsigned int   runtime_version;
-   // } __mulle_objc_compiler_info =
+   // } __mulle_objc_objccompilerinfo =
    // {
-   //    14, // load version
-   //    ((0 << 20) | (13 << 8) | 0) // runtime version
+   //    16, // load version UPDATE TO CURRENT!
+   //    ((0 << 20) | (18 << 8) | 0) // runtime version
    // };
 
    if( ! this->struct_read)

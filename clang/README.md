@@ -189,7 +189,7 @@ sudo apt-get update &&
 sudo apt-get install curl
 
 curl -sS https://www.codeon.de/dists/codeon-pub.asc | sudo apt-key add -
-echo "deb [arch=all] http://www.mulle-kybernetik.com `lsb_release -c -s` main" | sudo tee "/etc/apt/sources.list.d/mulle-kybernetik.com-main.list" > /dev/null
+sudo echo "deb [arch=amd64] http://download.codeon.de `lsb_release -c -s` main" > /etc/apt/sources.list.d/codeon.de-main.list
 
 sudo apt-get update &&
 sudo apt-get install mulle-clang
@@ -197,20 +197,22 @@ sudo apt-get install mulle-clang
 
 #### Debian
 
-You can install on Debian (and Ubuntu) with `dpkg` after downloading the appropriate package. Notice that the
-packages are still named with Ubuntu codes.
+You can install on Debian (and Ubuntu) with:
 
 ```
-sudo dpkg --install mulle-clang-10.0.0.2-${Ubuntu}-amd64.deb
+OS="`lsb_release -s -c`" \
+curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-10.0.0.0-${OS}-amd64.deb && \
+sudo dpkg --install mulle-clang-10.0.0.0-${OS}-amd64.deb
 ```
 
-Debian  | Ubuntu  | `shasum -b -a 256`
---------|---------|-----------------------------------------------------------------
-[bullseye](http://download.codeon.de/dists/focal/main/binary-amd64/mulle-clang-10.0.0.2-focal-amd64.deb)  | focal | `7305622a81ae3d2579f32622ef40e6fdd38d068fa717e4adf60b5ea9b98e6559`
-[buster](http://download.codeon.de/dists/bionic/main/binary-amd64/mulle-clang-10.0.0.2-bionic-amd64.deb)    | bionic | `3d54a5398d4f3884372094199fea7f4e99c5aea9c0bd066009d855685623b97e`
-[stretch](http://download.codeon.de/dists/xenial/main/binary-amd64/mulle-clang-10.0.0.2-xenial-amd64.deb) | xenial | `e0cfb43302cf9073786590f663a38e304b0350fe11e9f07b1cfd04bab23a56e9`
-[stretch i386](http://download.codeon.de/dists/xenial/main/binary-i386/mulle-clang-10.0.0.2-xenial-i386.deb)  | xenial i386 | `86df0d2fbe578514b7f42344c24a7884d5c667b5a7731fb8a15bf4dbd5e8b761`
+OS     | `shasum -b -a 256`
+-------|-----------------------------------------------------------------
+xenial | not-yet
+bionic | not-yet
+disco  | not-yet
+eoan   | not-yet
 
+-->
 
 ## Build
 * [How to Build](BUILD_MULLE_CLANG.md)

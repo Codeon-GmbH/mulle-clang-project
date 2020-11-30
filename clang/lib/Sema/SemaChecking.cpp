@@ -5580,6 +5580,14 @@ bool Sema::CheckObjCString(Expr *Arg) {
     return true;
   }
 
+// @mulle-objc@ literal is not ASCII >
+  if (Literal->containsNonAsciiOrNull()) {
+    Diag(Arg->getBeginLoc(), diag::err_mulle_nsstring_literal_not_ascii)
+        << Arg->getSourceRange();
+    return true;
+  }
+// @mulle-objc@ literal is not ASCII <
+
   if (Literal->containsNonAsciiOrNull()) {
     StringRef String = Literal->getString();
     unsigned NumBytes = String.size();

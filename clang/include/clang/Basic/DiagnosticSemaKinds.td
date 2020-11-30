@@ -8775,6 +8775,10 @@ def err_msvc_annotation_wide_str : Error<
 // CFString checking
 def err_cfstring_literal_not_string_constant : Error<
   "CFString literal is not a string constant">;
+// @mulle-objc@ literal is not ASCII >
+def err_mulle_nsstring_literal_not_ascii : Error<
+  "NSString literal is not ASCII">;
+// @mulle-objc@ literal is not ASCII <
 def warn_cfstring_truncated : Warning<
   "input conversion stopped due to an input byte that does not "
   "belong to the input codeset UTF-8">,

@@ -864,18 +864,6 @@ setup_build_environment()
 
    check_and_build_cmake
 
-   if [ "${CXX_COMPILER}" = "g++${BUILD_EXE_EXTENSION}" ]
-   then
-      install_binary_if_missing "g++${BUILD_EXE_EXTENSION}" "https://gcc.gnu.org/install/download.html"
-   else
-      if [ "${CXX_COMPILER}" = "clang++${BUILD_EXE_EXTENSION}" ]
-      then
-         install_binary_if_missing "clang++${BUILD_EXE_EXTENSION}" "https://clang.llvm.org/get_started.html"
-      else
-         install_binary_if_missing "${CXX_COMPILER}" "somewhere (cpp compiler)"
-      fi
-   fi
-
    if [ "${C_COMPILER}" = "gcc${BUILD_EXE_EXTENSION}" ]
    then
       install_binary_if_missing "gcc${BUILD_EXE_EXTENSION}" "https://gcc.gnu.org/install/download.html"
@@ -885,6 +873,18 @@ setup_build_environment()
          install_binary_if_missing "clang${BUILD_EXE_EXTENSION}" "https://clang.llvm.org/get_started.html"
       else
          install_binary_if_missing "${C_COMPILER}" "somewhere (c compiler)"
+      fi
+   fi
+
+   if [ "${CXX_COMPILER}" = "g++${BUILD_EXE_EXTENSION}" ]
+   then
+      install_binary_if_missing "g++${BUILD_EXE_EXTENSION}" "https://gcc.gnu.org/install/download.html" "build-essential"
+   else
+      if [ "${CXX_COMPILER}" = "clang++${BUILD_EXE_EXTENSION}" ]
+      then
+         install_binary_if_missing "clang++${BUILD_EXE_EXTENSION}" "https://clang.llvm.org/get_started.html" "clang"
+      else
+         install_binary_if_missing "${CXX_COMPILER}" "somewhere (cpp compiler)"
       fi
    fi
 

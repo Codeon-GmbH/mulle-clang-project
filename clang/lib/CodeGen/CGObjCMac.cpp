@@ -1344,6 +1344,11 @@ public:
   llvm::Value *GetClass(CodeGenFunction &CGF,
                         const ObjCInterfaceDecl *ID) override;
 
+// @mulle-objc@ emit class >
+  llvm::Value *GetClass(CodeGenFunction &CGF,
+                      const ObjCInterfaceDecl *ID,
+                      llvm::Value *self) override;                     
+// @mulle-objc@ emit class <
   llvm::Value *GetSelector(CodeGenFunction &CGF, Selector Sel) override;
   Address GetAddrOfSelector(CodeGenFunction &CGF, Selector Sel) override;
 
@@ -1632,6 +1637,11 @@ public:
 
   llvm::Value *GetClass(CodeGenFunction &CGF,
                         const ObjCInterfaceDecl *ID) override;
+// @mulle-objc@ emit class >
+  llvm::Value *GetClass(CodeGenFunction &CGF,
+                      const ObjCInterfaceDecl *ID,
+                      llvm::Value *self) override;                     
+// @mulle-objc@ emit class <
 
   llvm::Value *GetSelector(CodeGenFunction &CGF, Selector Sel) override
     { return EmitSelector(CGF, Sel); }
@@ -1898,6 +1908,15 @@ llvm::Value *CGObjCMac::GetClass(CodeGenFunction &CGF,
                                  const ObjCInterfaceDecl *ID) {
   return EmitClassRef(CGF, ID);
 }
+
+
+// @mulle-objc@ emit class <
+llvm::Value *CGObjCMac::GetClass(CodeGenFunction &CGF,
+                                 const ObjCInterfaceDecl *ID,
+                                 llvm::Value *self) {
+  return GetClass(CGF, ID);
+}         
+// @mulle-objc@ emit class <
 
 /// GetSelector - Return the pointer to the unique'd string for this selector.
 llvm::Value *CGObjCMac::GetSelector(CodeGenFunction &CGF, Selector Sel) {
@@ -7559,6 +7578,14 @@ llvm::Value *CGObjCNonFragileABIMac::GetClass(CodeGenFunction &CGF,
   return EmitClassRef(CGF, ID);
 }
 
+// @mulle-objc@ emit class >
+llvm::Value *CGObjCNonFragileABIMac::GetClass(CodeGenFunction &CGF,
+                                              const ObjCInterfaceDecl *ID,
+                                              llvm::Value *self) {
+  return GetClass(CGF, ID);
+}         
+// @mulle-objc@ emit class <
+
 /// Generates a message send where the super is the receiver.  This is
 /// a message send to self with special delivery semantics indicating
 /// which class's method should be called.
@@ -7904,7 +7931,10 @@ CodeGen::CreateMacObjCRuntime(CodeGen::CodeGenModule &CGM) {
   case ObjCRuntime::GNUstep:
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
+  // @mulle-objc@ compiler: ugliness add ObjCRuntime::Mulle to other runtime code >
+  case ObjCRuntime::Mulle:
     llvm_unreachable("these runtimes are not Mac runtimes");
+  // @mulle-objc@ compiler: ugliness add ObjCRuntime::Mulle to other runtime code <
   }
   llvm_unreachable("bad runtime");
 }

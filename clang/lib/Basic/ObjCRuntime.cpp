@@ -38,6 +38,9 @@ raw_ostream &clang::operator<<(raw_ostream &out, const ObjCRuntime &value) {
   case ObjCRuntime::GNUstep: out << "gnustep"; break;
   case ObjCRuntime::GCC: out << "gcc"; break;
   case ObjCRuntime::ObjFW: out << "objfw"; break;
+  // @mulle-objc@ compiler: output compiler specific stuff >
+  case ObjCRuntime::Mulle: out << "mulle"; break;
+  // @mulle-objc@ compiler: output compiler specific stuff <
   }
   if (value.getVersion() > VersionTuple(0)) {
     out << '-' << value.getVersion();
@@ -79,6 +82,11 @@ bool ObjCRuntime::tryParse(StringRef input) {
   } else if (runtimeName == "objfw") {
     kind = ObjCRuntime::ObjFW;
     Version = VersionTuple(0, 8);
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes >
+  } else if (runtimeName == "mulle") {
+    kind = ObjCRuntime::Mulle;
+    Version = VersionTuple(0, 0);
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes <
   } else {
     return true;
   }

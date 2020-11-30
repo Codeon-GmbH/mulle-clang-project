@@ -994,7 +994,19 @@ void CodeGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
       CGM.getDiags().Report(diag::err_opt_not_valid_on_target)
         << "-mpacked-stack";
     Fn->addFnAttr("packed-stack");
+  // @mulle-objc@ MetaABI: change return type of method to "void *" always (if not void) >
+  // it would be nicer to place this into the `else in the
+  // code jungle below, but the reindentation scares me
+
+  if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     if( dyn_cast_or_null< ObjCMethodDecl>( CurCodeDecl))
+     {
+        if( ! RetTy->isVoidType())
+           RetTy = CGM.getContext().VoidPtrTy;
+     }
   }
+  // @mulle-objc@ MetaABI: change return type of method to "void *" always (if not void) <
 
   if (RetTy->isVoidType()) {
     // Void type; nothing to return.

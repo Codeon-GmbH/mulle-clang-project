@@ -866,6 +866,14 @@ void ASTDeclWriter::VisitObjCPropertyDecl(ObjCPropertyDecl *D) {
   Record.AddSourceLocation(D->getSetterNameLoc());
   Record.AddDeclRef(D->getGetterMethodDecl());
   Record.AddDeclRef(D->getSetterMethodDecl());
+  // @mulle-objc@ new property attribute container >
+  Record.AddDeclarationName(D->getAdderName());
+  Record.AddSourceLocation(D->getAdderNameLoc());
+  Record.AddDeclarationName(D->getRemoverName());
+  Record.AddSourceLocation(D->getRemoverNameLoc());
+  Record.AddDeclRef(D->getAdderMethodDecl());
+  Record.AddDeclRef(D->getRemoverMethodDecl());
+  // @mulle-objc@ new property attribute container <
   Record.AddDeclRef(D->getPropertyIvarDecl());
   Code = serialization::DECL_OBJC_PROPERTY;
 }

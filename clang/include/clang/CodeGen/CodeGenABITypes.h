@@ -50,9 +50,12 @@ namespace CodeGen {
 class CGFunctionInfo;
 class CodeGenModule;
 
+// @mulle-objc@ add isSuper to  arrangeObjCMessageSendSignature >
 const CGFunctionInfo &arrangeObjCMessageSendSignature(CodeGenModule &CGM,
                                                       const ObjCMethodDecl *MD,
-                                                      QualType receiverType);
+                                                      QualType receiverType,
+                                                      bool isSuper = false);
+// @mulle-objc@ add isSuper to  arrangeObjCMessageSendSignature <
 
 const CGFunctionInfo &arrangeFreeFunctionType(CodeGenModule &CGM,
                                               CanQual<FunctionProtoType> Ty);

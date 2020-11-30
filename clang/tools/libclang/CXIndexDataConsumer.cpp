@@ -839,6 +839,10 @@ bool CXIndexDataConsumer::handleObjCProperty(const ObjCPropertyDecl *D) {
   ObjCPropertyDeclInfo DInfo;
   EntityInfo GetterEntity;
   EntityInfo SetterEntity;
+  // @mulle-objc@ new property attribute container >
+  EntityInfo AdderEntity;
+  EntityInfo RemoverEntity;
+  // @mulle-objc@ new property attribute container <
 
   DInfo.ObjCPropDeclInfo.declInfo = &DInfo;
 
@@ -854,6 +858,20 @@ bool CXIndexDataConsumer::handleObjCProperty(const ObjCPropertyDecl *D) {
   } else {
     DInfo.ObjCPropDeclInfo.setter = nullptr;
   }
+  // @mulle-objc@ new property attribute container >
+  if (ObjCMethodDecl *Adder= D->getAdderMethodDecl()) {
+    getEntityInfo(Adder, AdderEntity, SA);
+    DInfo.ObjCPropDeclInfo.adder = &AdderEntity;
+  } else {
+    DInfo.ObjCPropDeclInfo.adder = nullptr;
+  }
+  if (ObjCMethodDecl *Remover = D->getRemoverMethodDecl()) {
+    getEntityInfo(Remover, RemoverEntity, SA);
+    DInfo.ObjCPropDeclInfo.remover = &RemoverEntity;
+  } else {
+    DInfo.ObjCPropDeclInfo.remover = nullptr;
+  }
+  // @mulle-objc@ new property attribute container <
 
   return handleDecl(D, D->getLocation(), getCursor(D), DInfo);
 }

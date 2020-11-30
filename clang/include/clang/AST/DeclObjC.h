@@ -154,6 +154,13 @@ private:
   void *ParamsAndSelLocs = nullptr;
   unsigned NumParams = 0;
 
+  // @mulle-objc@ MetaABI: ivars ParamRecord >
+  RecordDecl    *ParamRecord;
+
+  // return value record (if needed)
+  RecordDecl    *RvalRecord;
+  // @mulle-objc@ MetaABI: ivars ParamRecord <
+
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
 
@@ -167,6 +174,13 @@ private:
   /// CmdDecl - Decl for the implicit _cmd parameter. This is lazily
   /// constructed by createImplicitParams.
   ImplicitParamDecl *CmdDecl = nullptr;
+
+   /// @mulle-objc@ MetaABI: ParamDecl storage of declaration >>>
+   /// Para,Decl - Decl for the implicit _param parameter. This is lazily
+   /// constructed by ActOnMethodDeclaration.
+  ImplicitParamDecl *ParamDecl;
+  bool              _isMetaABIVoidPointerParam;
+   /// @mulle-objc@ MetaABI: ParamDecl storage of declaration <<<
 
   ObjCMethodDecl(SourceLocation beginLoc, SourceLocation endLoc,
                  Selector SelInfo, QualType T, TypeSourceInfo *ReturnTInfo,
@@ -400,6 +414,25 @@ public:
   param_type_iterator param_type_end() const {
     return llvm::map_iterator(param_end(), GetTypeFn());
   }
+
+  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors >
+  // struct {}
+  RecordDecl   *getParamRecord() const { return ParamRecord; }
+  void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
+
+  // struct {}  *param
+  ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
+  void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
+
+  bool isMetaABIVoidPointerParam() const { return _isMetaABIVoidPointerParam; }
+  void setMetaABIVoidPointerParam(bool Flag) { _isMetaABIVoidPointerParam = Flag; }
+
+  // struct {} rval;
+  RecordDecl   *getRvalRecord() const { return RvalRecord; }
+  void setRvalRecord( RecordDecl  *RD) { RvalRecord = RD; }
+
+  FieldDecl  *FindParamRecordField( IdentifierInfo *II);
+  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors <
 
   /// createImplicitParams - Used to lazily create the self and cmd
   /// implict parameters. This must be called prior to using getSelfDecl()
@@ -762,12 +795,25 @@ public:
     OBJC_PR_null_resettable = 0x2000,
     OBJC_PR_class = 0x4000,
     OBJC_PR_direct = 0x8000
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    , OBJC_PR_dynamic         = 0x10000
+    , OBJC_PR_serializable    = 0x20000
+    , OBJC_PR_nonserializable = 0x40000
+    , OBJC_PR_container       = 0x80000
+    , OBJC_PR_relationship    = 0x100000
+    , OBJC_PR_observable      = 0x200000
+    , OBJC_PR_adder           = 0x400000
+    , OBJC_PR_remover         = 0x800000
+    // MEMO: change NumPropertyAttrsBits below when adding
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
     // Adding a property should change NumPropertyAttrsBits
   };
 
   enum {
     /// Number of bits fitting all the property attributes.
-    NumPropertyAttrsBits = 16
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    NumPropertyAttrsBits = 24
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
   };
 
   enum SetterKind { Assign, Retain, Copy, Weak };
@@ -805,6 +851,28 @@ private:
 
   // Declaration of setter instance method
   ObjCMethodDecl *SetterMethodDecl = nullptr;
+
+  // @mulle-objc@ new property attribute container >
+  // Declaration of container add instance method
+  // adder name or NULL if no adder
+  Selector AdderName;
+
+  // remover name or NULL if no setter
+  Selector RemoverName;
+
+  // location of the getter attribute's value
+  SourceLocation AdderNameLoc;
+
+  // location of the setter attribute's value
+  SourceLocation RemoverNameLoc;
+
+  // Declaration of adder instance method
+  ObjCMethodDecl *AdderMethodDecl = nullptr;
+
+  // Declaration of remove instance method
+  ObjCMethodDecl *RemoverMethodDecl = nullptr;
+  // @mulle-objc@ new property attribute container <
+
 
   // Synthesize ivar for this property
   ObjCIvarDecl *PropertyIvarDecl = nullptr;
@@ -888,6 +956,20 @@ public:
             (OBJC_PR_retain | OBJC_PR_strong | OBJC_PR_copy));
   }
 
+  // @mulle-objc@ new property attributes: container, observable, relationship >
+  bool isContainer() const {
+    return (PropertyAttributes & OBJC_PR_container);
+  }
+
+  bool isObservable() const {
+    return (PropertyAttributes & OBJC_PR_observable);
+  }
+
+  bool isRelationship() const {
+    return (PropertyAttributes & OBJC_PR_relationship);
+  }
+  // @mulle-objc@ new property attributes: container, observable, relationship <
+
   bool isInstanceProperty() const { return !isClassProperty(); }
   bool isClassProperty() const { return PropertyAttributes & OBJC_PR_class; }
   bool isDirectProperty() const { return PropertyAttributes & OBJC_PR_direct; }
@@ -938,6 +1020,30 @@ public:
 
   ObjCMethodDecl *getSetterMethodDecl() const { return SetterMethodDecl; }
   void setSetterMethodDecl(ObjCMethodDecl *gDecl) { SetterMethodDecl = gDecl; }
+
+  // @mulle-objc@ new property attributes container >
+  Selector getAdderName() const { return AdderName; }
+  SourceLocation getAdderNameLoc() const { return AdderNameLoc; }
+
+  void setAdderName(Selector Sel, SourceLocation Loc = SourceLocation()) {
+    AdderName = Sel;
+    AdderNameLoc = Loc;
+  }
+
+  Selector getRemoverName() const { return RemoverName; }
+  SourceLocation getRemoverNameLoc() const { return RemoverNameLoc; }
+
+  void setRemoverName(Selector Sel, SourceLocation Loc = SourceLocation()) {
+    RemoverName = Sel;
+    RemoverNameLoc = Loc;
+  }
+
+  ObjCMethodDecl *getAdderMethodDecl() const { return AdderMethodDecl; }
+  void setAdderMethodDecl(ObjCMethodDecl *gDecl) { AdderMethodDecl = gDecl; }
+
+  ObjCMethodDecl *getRemoverMethodDecl() const { return RemoverMethodDecl; }
+  void setRemoverMethodDecl(ObjCMethodDecl *gDecl) { RemoverMethodDecl = gDecl; }
+  // @mulle-objc@ new property attributes container <
 
   // Related to \@optional/\@required declared in \@protocol
   void setPropertyImplementation(PropertyControl pc) {
@@ -1518,6 +1624,10 @@ public:
   /// objc_runtime_name attribute or class name.
   StringRef getObjCRuntimeNameAsString() const;
 
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix >
+  std::string  getIvarHashString( ASTContext &C) const;
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix <
+
   /// Returns the designated initializers for the interface.
   ///
   /// If this declaration does not have methods marked as designated
@@ -1847,6 +1957,16 @@ public:
     ObjCInterfaceDecl *ClassDeclared;
     return lookupInstanceVariable(IVarName, ClassDeclared);
   }
+
+// @mulle-objc@ language: compatible lookup of instance variable for property >
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName,
+                                       ObjCInterfaceDecl *&ClassDeclared);
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName) {
+    ObjCInterfaceDecl *ClassDeclared;
+    return lookupInstanceVariableOfProperty( C, PropertyName, ClassDeclared);
+  }
+// @mulle-objc@ language: compatible lookup of instance variable for property <
+
 
   ObjCProtocolDecl *lookupNestedProtocol(IdentifierInfo *Name);
 
@@ -2695,6 +2815,10 @@ public:
   std::string getNameAsString() const {
     return getName();
   }
+
+  // @mulle-objc@ codegen: make an ivar hash string for fragility fix >
+  std::string getIvarHashString() const;
+  // @mulle-objc@ codegen: make an ivar hash string for fragility fix <
 
   /// Produce a name to be used for class's metadata. It comes either via
   /// class's objc_runtime_name attribute or class name.

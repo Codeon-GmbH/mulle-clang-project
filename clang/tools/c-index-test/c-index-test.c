@@ -3765,6 +3765,16 @@ static void index_indexDeclaration(CXClientData client_data,
       printEntityInfo("     <setter>", client_data, PropInfo->setter);
       printf("\n");
     }
+    // @mulle-objc@ new property attributes container >
+    if (PropInfo->getter) {
+      printEntityInfo("     <adder>", client_data, PropInfo->adder);
+      printf("\n");
+    }
+    if (PropInfo->setter) {
+      printEntityInfo("     <remover>", client_data, PropInfo->remover);
+      printf("\n");
+    }
+    // @mulle-objc@ new property attributes container <
   }
 
   if ((CXXClassInfo = clang_index_getCXXClassDeclInfo(info))) {

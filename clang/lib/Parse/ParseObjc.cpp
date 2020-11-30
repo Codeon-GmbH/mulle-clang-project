@@ -288,7 +288,14 @@ Decl *Parser::ParseObjCAtInterfaceDeclaration(SourceLocation AtLoc,
         EndProtoLoc, attrs);
 
     if (Tok.is(tok::l_brace))
-      ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
+    // @mulle-objc@ language: no class extensions
+    {
+       if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          Diag(Tok, diag::err_mulle_objc_no_class_extension);
+       else
+       ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
+    }
+    // @mulle-objc@ language: no class extensions <
 
     ParseObjCInterfaceDeclList(tok::objc_not_keyword, CategoryType);
 
@@ -431,6 +438,12 @@ ObjCTypeParamList *Parser::parseObjCTypeParamListOrProtocolRefs(
   SmallVector<Decl *, 4> typeParams;
   auto makeProtocolIdentsIntoTypeParameters = [&]() {
     unsigned index = 0;
+
+    // @mulle-objc@ language: turn off generics >
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      Diag(Tok, diag::err_mulle_objc_no_cpp_generics);
+    else
+    // @mulle-objc@ language: turn off generics <
     for (const auto &pair : protocolIdents) {
       DeclResult typeParam = Actions.actOnObjCTypeParam(
           getCurScope(), ObjCTypeParamVariance::Invariant, SourceLocation(),
@@ -758,9 +771,29 @@ void Parser::ParseObjCInterfaceDeclList(tok::ObjCKeywordKind contextKey,
           SetterSel = SelectorTable::constructSetterSelector(
               PP.getIdentifierTable(), PP.getSelectorTable(),
               FD.D.getIdentifier());
+
+        // @mulle-objc@ added property methods adder/remover >
+        IdentifierInfo *AdderName = OCDS.getAdderName();
+        Selector AdderSel;
+        if (AdderName)
+          AdderSel = PP.getSelectorTable().getSelector(1, &AdderName);
+        else
+          AdderSel = SelectorTable::constructAdderSelector(
+              PP.getIdentifierTable(), PP.getSelectorTable(),
+              FD.D.getIdentifier());
+        IdentifierInfo *RemoverName = OCDS.getRemoverName();
+        Selector RemoverSel;
+        if (RemoverName)
+          RemoverSel = PP.getSelectorTable().getSelector(1, &RemoverName);
+        else
+          RemoverSel = SelectorTable::constructRemoverSelector(
+              PP.getIdentifierTable(), PP.getSelectorTable(),
+              FD.D.getIdentifier());
+
         Decl *Property = Actions.ActOnProperty(
-            getCurScope(), AtLoc, LParenLoc, FD, OCDS, GetterSel, SetterSel,
+            getCurScope(), AtLoc, LParenLoc, FD, OCDS, GetterSel, SetterSel, AdderSel, RemoverSel,
             MethodImplKind);
+        // @mulle-objc@ added property methods adder/remover <
 
         FD.complete(Property);
       };
@@ -859,6 +892,36 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
 
     SourceLocation AttrName = ConsumeToken(); // consume last attribute name
 
+    // @mulle-objc@ language: remove strong, weak and friends >
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      //  check that we know it, could also issue a warning maybe ?
+      if( ! (II->isStr("readonly") ||
+             II->isStr("assign") ||
+             II->isStr("retain") ||
+             II->isStr("readwrite") ||
+             II->isStr("copy") ||
+             II->isStr("nonnull") ||
+             II->isStr("nonatomic") ||
+             II->isStr("dynamic") ||
+             II->isStr("serializable") ||
+             II->isStr("nonserializable") ||
+             II->isStr("container") ||
+             II->isStr("relationship") ||
+             II->isStr("observable") ||
+             II->isStr("adder") ||
+             II->isStr("remover") ||
+             II->isStr("getter") ||
+             II->isStr("setter")))
+      {
+        Diag(Tok, diag::err_mulle_objc_no_support_for_property_modifier)
+          << II->getNameStart();
+        SkipUntil(tok::r_paren, StopAtSemi);
+        return;
+      }
+    }
+    // @mulle-objc@ language: remove strong, weak and friends <
+
     if (II->isStr("readonly"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_readonly);
     else if (II->isStr("assign"))
@@ -879,23 +942,35 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_atomic);
     else if (II->isStr("weak"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_weak);
-    else if (II->isStr("getter") || II->isStr("setter")) {
-      bool IsSetter = II->getNameStart()[0] == 's';
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    else if (II->isStr("dynamic"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_dynamic);
+    else if (II->isStr("serializable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_serializable);
+    else if (II->isStr("nonserializable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_nonserializable);
+    else if (II->isStr("container"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_container);
+    else if (II->isStr("observable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_observable);
+    else if (II->isStr("relationship"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_relationship);
+    else if (II->isStr("getter") || II->isStr("setter")  || II->isStr("adder")  || II->isStr("remover")) {
+      char methodType = II->getNameStart()[0];
 
-      // getter/setter require extra treatment.
-      unsigned DiagID = IsSetter ? diag::err_objc_expected_equal_for_setter :
-                                   diag::err_objc_expected_equal_for_getter;
-
-      if (ExpectAndConsume(tok::equal, DiagID)) {
+      if (ExpectAndConsume(tok::equal, diag::err_objc_expected_equal_for_method, II->getNameStart())) {
         SkipUntil(tok::r_paren, StopAtSemi);
         return;
       }
 
       if (Tok.is(tok::code_completion)) {
-        if (IsSetter)
-          Actions.CodeCompleteObjCPropertySetter(getCurScope());
-        else
-          Actions.CodeCompleteObjCPropertyGetter(getCurScope());
+        switch( methodType)
+        {
+           default  : Actions.CodeCompleteObjCPropertyGetter(getCurScope()); break;
+           case 's' : Actions.CodeCompleteObjCPropertySetter(getCurScope()); break;
+           case 'a' : Actions.CodeCompleteObjCPropertyAdder(getCurScope()); break;
+           case 'r' : Actions.CodeCompleteObjCPropertyRemover(getCurScope()); break;
+        }
         return cutOffParsing();
       }
 
@@ -903,25 +978,40 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       IdentifierInfo *SelIdent = ParseObjCSelectorPiece(SelLoc);
 
       if (!SelIdent) {
-        Diag(Tok, diag::err_objc_expected_selector_for_getter_setter)
-          << IsSetter;
+        Diag(Tok, diag::err_objc_expected_selector_for_method) << II->getNameStart();
         SkipUntil(tok::r_paren, StopAtSemi);
         return;
       }
 
-      if (IsSetter) {
-        DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_setter);
-        DS.setSetterName(SelIdent, SelLoc);
-
-        if (ExpectAndConsume(tok::colon,
-                             diag::err_expected_colon_after_setter_name)) {
-          SkipUntil(tok::r_paren, StopAtSemi);
-          return;
-        }
-      } else {
-        DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_getter);
-        DS.setGetterName(SelIdent, SelLoc);
+      switch( methodType)
+      {
+         default  :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_getter);
+           DS.setGetterName(SelIdent, SelLoc);
+           break;
+         ;;
+         case 's' :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_setter);
+           DS.setSetterName(SelIdent, SelLoc);
+           break;
+         case 'a' :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_adder);
+           DS.setAdderName(SelIdent, SelLoc);
+           break;
+         case 'r' :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_remover);
+           DS.setRemoverName(SelIdent, SelLoc);
+           break;
       }
+
+      if( methodType != 'g')
+      {
+         if (ExpectAndConsume(tok::colon, diag::err_expected_colon_after_method_name, II->getNameStart())) {
+            SkipUntil(tok::r_paren, StopAtSemi);
+            return;
+         }
+      }
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
     } else if (II->isStr("nonnull")) {
       if (DS.getPropertyAttributes() & ObjCDeclSpec::DQ_PR_nullability)
         diagnoseRedundantPropertyNullability(*this, DS,
@@ -1177,9 +1267,17 @@ void Parser::ParseObjCTypeQualifierList(ObjCDeclSpec &DS,
         break;
 
       case objc_nullable:
-        Qual = ObjCDeclSpec::DQ_CSNullability;
-        Nullability = NullabilityKind::Nullable;
-        break;
+        // @mulle-objc@ language: remove nullable which is the wrong philosophy >
+        if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        {
+           Qual = ObjCDeclSpec::DQ_CSNullability;
+           Nullability = NullabilityKind::Nullable;
+           break;
+        }
+        // @mulle-objc@ language: remove nullable which is the wrong philosophy <
+        Diag(Tok, diag::err_mulle_objc_no_nullable);
+        LLVM_FALLTHROUGH;
+        // fallthru to unspecified
 
       case objc_null_unspecified:
         Qual = ObjCDeclSpec::DQ_CSNullability;
@@ -1929,10 +2027,18 @@ void Parser::ParseObjCClassInstanceVariables(Decl *interfaceDecl,
       }
 
       switch (Tok.getObjCKeywordID()) {
+      case tok::objc_package:
+        // @mulle-objc@ no JAVA package for mulle-objc >
+        if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        {
+          Diag(Tok, diag::err_mulle_objc_no_package);
+          continue;
+        }
+        LLVM_FALLTHROUGH;
+        // @mulle-objc@ no JAVA package for mulle-objc <
       case tok::objc_private:
       case tok::objc_public:
       case tok::objc_protected:
-      case tok::objc_package:
         visibility = Tok.getObjCKeywordID();
         ConsumeToken();
         continue;
@@ -3296,6 +3402,22 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
 
   unsigned nKeys = KeyIdents.size();
   if (nKeys == 0) {
+    // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co >
+    if( getLangOpts().ObjCAllocsAutoreleasedObjects && selIdent)
+    {
+       StringRef   s;
+
+       s = selIdent->getName();
+       if( s.equals( "alloc"))
+          selIdent = &PP.getIdentifierTable().get( "instantiate");
+       else if( s.equals( "new"))
+          selIdent = &PP.getIdentifierTable().get( "instantiatedObject");
+       else if( s.equals( "copy"))
+          selIdent = &PP.getIdentifierTable().get( "immutableInstance");
+       else if( s.equals( "mutableCopy"))
+          selIdent = &PP.getIdentifierTable().get( "mutableInstance");
+    }
+    // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co <
     KeyIdents.push_back(selIdent);
     KeyLocs.push_back(Loc);
   }

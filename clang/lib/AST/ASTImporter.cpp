@@ -5023,6 +5023,14 @@ ExpectedDecl ASTNodeImporter::VisitObjCPropertyDecl(ObjCPropertyDecl *D) {
   ToProperty->setSetterName(ToSetterName, ToSetterNameLoc);
   ToProperty->setGetterMethodDecl(ToGetterMethodDecl);
   ToProperty->setSetterMethodDecl(ToSetterMethodDecl);
+  // @mulle-objc@ new property attributes container >
+#if 0
+  ToProperty->setAdderName(ToAdderName, ToAdderNameLoc);
+  ToProperty->setRemoverName(ToRemoverName, ToRemoverNameLoc);
+  ToProperty->setAdderMethodDecl(ToAdderMethodDecl);
+  ToProperty->setRemoverMethodDecl(ToRemoverMethodDecl);
+#endif
+  // @mulle-objc@ new property attributes container <
   ToProperty->setPropertyIvarDecl(ToPropertyIvarDecl);
   return ToProperty;
 }

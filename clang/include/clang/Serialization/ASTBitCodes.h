@@ -1013,6 +1013,11 @@ namespace serialization {
       /// \brief The '_Sat unsigned long _Fract' type
       PREDEF_TYPE_SAT_ULONG_FRACT_ID = 69,
 
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+      /// The ObjC 'Protocol' type.
+      PREDEF_TYPE_OBJC_PROTOCOL = 70,
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+
       /// OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
       PREDEF_TYPE_##Id##_ID,
@@ -1075,12 +1080,18 @@ namespace serialization {
       /// Objective-C "SEL" redefinition type
       SPECIAL_TYPE_OBJC_SEL_REDEFINITION       = 6,
 
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+/// unfortunately need to edit SPECIAL_TYPE_UCONTEXT_T to 8
+/// and add 1 to NumSpecialTypeIDs
+      SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION  = 7,
+
       /// C ucontext_t typedef type
-      SPECIAL_TYPE_UCONTEXT_T                  = 7
+      SPECIAL_TYPE_UCONTEXT_T                  = 8
     };
 
-    /// The number of special type IDs.
-    const unsigned NumSpecialTypeIDs = 8;
+    /// \brief The number of special type IDs.
+    const unsigned NumSpecialTypeIDs = 10;
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
     /// Predefined declaration IDs.
     ///

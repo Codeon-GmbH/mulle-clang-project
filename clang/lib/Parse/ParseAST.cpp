@@ -156,6 +156,11 @@ void clang::ParseAST(Sema &S, bool PrintStats, bool SkipFunctionBodies) {
     Parser::DeclGroupPtrTy ADecl;
     for (bool AtEOF = P.ParseFirstTopLevelDecl(ADecl); !AtEOF;
          AtEOF = P.ParseTopLevelDecl(ADecl)) {
+
+      // @mulle-objc@ compiler: hook to grab values from preprocessor for codegen ->
+      Consumer->ParserDidFinish( &P);
+      // @mulle-objc@ compiler: <-
+
       // If we got a null return and something *was* parsed, ignore it.  This
       // is due to a top-level semicolon, an action override, or a parse error
       // skipping something.

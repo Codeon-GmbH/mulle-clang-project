@@ -17,6 +17,9 @@
 #include "CGCXXABI.h"
 #include "CGCleanup.h"
 #include "CodeGenFunction.h"
+// @mulle-objc@ need CGRecordLayout >
+#include "CGRecordLayout.h"
+// @mulle-objc@ need CGRecordLayout <
 #include "CodeGenModule.h"
 #include "TargetInfo.h"
 #include "clang/AST/Attr.h"

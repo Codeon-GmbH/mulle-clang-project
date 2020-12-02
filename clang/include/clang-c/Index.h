@@ -3268,10 +3268,10 @@ enum CXTypeKind {
   CXType_UAccum = 37,
   CXType_ULongAccum = 38,
   CXType_FirstBuiltin = CXType_Void,
-//@mulle-objc@ protocol is an integer >
+// @mulle-objc@ protocol is an integer >
   CXType_ObjCProtocol = 39,
   CXType_LastBuiltin  = CXType_ObjCProtocol,
-//@mulle-objc@ protocol is an integer <
+// @mulle-objc@ protocol is an integer <
 
   CXType_Complex = 100,
   CXType_Pointer = 101,

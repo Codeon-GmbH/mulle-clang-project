@@ -4128,18 +4128,19 @@ Decl *Sema::ActOnAtEnd(Scope *S, SourceRange AtEnd, ArrayRef<Decl *> allMethods,
             if (ObjCMethodDecl *GetterMethod =
                     Ext->getInstanceMethod(Property->getGetterName()))
               GetterMethod->setPropertyAccessor(true);
-            if (!Property->isReadOnly())
+            // @mulle-objc@ new property attribute container >
+            if (!Property->isReadOnly()) {
               if (ObjCMethodDecl *SetterMethod
                     = Ext->getInstanceMethod(Property->getSetterName()))
                 SetterMethod->setPropertyAccessor(true);
-              // @mulle-objc@ new property attribute container >
               if (ObjCMethodDecl *AdderMethod
                     = Ext->getInstanceMethod(Property->getAdderName()))
                 AdderMethod->setPropertyAccessor(true);
               if (ObjCMethodDecl *RemoverMethod
                     = Ext->getInstanceMethod(Property->getRemoverName()))
                 RemoverMethod->setPropertyAccessor(true);
-              // @mulle-objc@ new property attribute container <
+            }
+            // @mulle-objc@ new property attribute container <
           }
         }
       }

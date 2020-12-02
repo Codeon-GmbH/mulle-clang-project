@@ -407,8 +407,6 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
 
   case Type::Builtin: {
     switch (cast<BuiltinType>(Ty)->getKind()) {
-         ResultType = llvm::Type::getInt8Ty(getLLVMContext());
-     break;
     case BuiltinType::ObjCSel:
     case BuiltinType::ObjCProtocol:
       // @mulle-objc@ uniqueid: sel: change type to uint32_t
@@ -421,7 +419,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
                                  static_cast<unsigned>(Context.getTypeSize(Context.getIntTypeForBitwidth(32, false))))  ;
          break;
       }
-      
+
       // @mulle-objc@ id: is a void ptr
       LLVM_FALLTHROUGH;
       // LLVM void type can only be used as the result of a function call.  Just

@@ -30,7 +30,7 @@
 extern "C"
 {
    extern uint32_t  MulleObjCUniqueIdHashForString( std::string s);
-};
+}
 // @mulle-objc@ universeid hash <
 
 using namespace clang;

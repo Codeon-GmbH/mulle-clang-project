@@ -910,7 +910,6 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
    RecordDecl             *RD;
    QualType               recordTy;
    QualType               recordPtrTy;
-   llvm::Type             *llvmRecType;
    llvm::Value            *paramAddr;
    CharUnits              alignment;
 
@@ -946,7 +945,6 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
 
          recordTy    = CGM.getContext().getTagDeclType( RD);
          recordPtrTy = CGM.getContext().getPointerType( recordTy);
-         llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
 
          // get _param address (known to be big enough)
          auto it = LocalDeclMap.find( MD->getParamDecl());

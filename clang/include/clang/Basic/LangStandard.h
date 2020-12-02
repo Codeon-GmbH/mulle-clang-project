@@ -30,9 +30,9 @@ enum class Language : uint8_t {
   C,
   CXX,
   ObjC,
-//@mulle-objc@ >
+// @mulle-objc@ >
   ObjCAAM,
-//@mulle-objc@ <
+// @mulle-objc@ <
   ObjCXX,
   OpenCL,
   CUDA,

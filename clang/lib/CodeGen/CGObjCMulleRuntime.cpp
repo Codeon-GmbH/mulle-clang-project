@@ -63,7 +63,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  16
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  17
 
 
 using namespace clang;
@@ -112,7 +112,7 @@ namespace {
          switch( optLevel)
          {
          case 3  : name = "mulle_objc_object_call_inline"; break;
-         default : name = "mulle_objc_object_call_partialinline"; break;
+         default : name = "mulle_objc_object_call_inline_partial"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -137,7 +137,7 @@ namespace {
          switch( optLevel)
          {
          case 3  : name = "mulle_objc_object_call_inline"; break;
-         default : name = "mulle_objc_object_call_partialinline"; break;
+         default : name = "mulle_objc_object_call_inline_partial"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -201,7 +201,7 @@ namespace {
          switch( optLevel)
          {
          case 3  : name = "mulle_objc_object_supercall_inline"; break;
-         default : name = "mulle_objc_object_supercall_partialinline"; break;
+         default : name = "mulle_objc_object_supercall_inline_partial"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_supercall"; break;
          }
@@ -2017,14 +2017,16 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 }
 
 
+/*
+ * Lookup Class via Object NoFCS = no fast classes
+ */
 static const char   *getObjectNoFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
-   // inline is same for fast/nofast
-   default : return( "mulle_objc_object_inlinelookup_infraclass_nofail");
+   default : return( "mulle_objc_object_lookup_infraclass_inline_nofail_nofast");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_object_lookup_infraclass_nofast_nofail");
+   case 0  : return( "mulle_objc_object_lookup_infraclass_nofail_nofast");
    }
 }
 
@@ -2032,7 +2034,7 @@ static const char   *getObjectNoFCSLookupClassFunctionName( int optLevel) {
 static const char   *getObjectFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
-   default : return( "mulle_objc_object_inlinelookup_infraclass_nofail");
+   default : return( "mulle_objc_object_lookup_infraclass_inline_nofail");
    case 1  :
    case -1 :
    case 0  : return( "mulle_objc_object_lookup_infraclass_nofail");
@@ -2040,15 +2042,16 @@ static const char   *getObjectFCSLookupClassFunctionName( int optLevel) {
 }
 
 
-
+/*
+ * Lookup Class via Runtime NoFCS = no fast classes
+ */
 static const char   *getRuntimeNoFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
-   // inline is same for fast/nofast
-   default : return( "mulle_objc_global_inlinelookup_infraclass_nofail");
+   default : return( "mulle_objc_global_lookup_infraclass_inline_nofail_nofast");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_global_lookup_infraclass_nofast_nofail");
+   case 0  : return( "mulle_objc_global_lookup_infraclass_nofail_nofast");
    }
 }
 
@@ -2056,8 +2059,7 @@ static const char   *getRuntimeNoFCSLookupClassFunctionName( int optLevel) {
 static const char   *getRuntimeFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
-   // inline is same for fast/nofast
-   default : return( "mulle_objc_global_inlinelookup_infraclass_nofail");
+   default : return( "mulle_objc_global_lookup_infraclass_inline_nofail");
    case 1  :
    case -1 :
    case 0  : return( "mulle_objc_global_lookup_infraclass_nofail");

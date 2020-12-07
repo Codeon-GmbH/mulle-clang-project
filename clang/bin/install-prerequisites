@@ -37,7 +37,7 @@ Options:
 EOF
    (
       cat <<EOF
-   --no-lldb            : do not build mulle-lldb
+   --with-lldb          : build mulle-lldb
    --no-ninja           : use make instead of ninja
    --wsl                : build for windows inside the WSL
    -n                   : dry run
@@ -717,14 +717,13 @@ setup_build_environment()
 
 main()
 {
-   OWD
    PREFIX="DEFAULT"
 
    OWD="`pwd -P`"
 
    BUILD_CLANG="${BUILD_CLANG:-YES}"
    BUILD_LLVM="${BUILD_LLVM:-YES}"
-   BUILD_LLDB="${BUILD_LLDB:-YES}"
+   BUILD_LLDB="${BUILD_LLDB:-NO}"
    BUILD_RT="${BUILD_RT:-YES}"
 
    INSTALL_LLVM="${INSTALL_LLVM:-YES}"
@@ -854,8 +853,6 @@ main()
 
       shift
    done
-
-   setup_fetch_environment
 
    COMMAND="${1:-default}"
    [ $# -eq 0 ] || shift
@@ -1014,7 +1011,7 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
    # override this to use pre-installed llvm
 
    case "$COMMAND" in
-      install)
+      default|install)
          setup_build_environment
       ;;
 

@@ -177,45 +177,6 @@ If you are building inside a fresh system, try [install-prerequisites](clang/bin
 that can install all prerequisites for a macos or debian based system.
 
 
-<---
-
-## Install
-
-Building a `llvm_project` based compiler is tedious and resource intensive.
-There may be pre-built binary packages available. Check the list below for
-availability.
-
-### macOS
-
-You can use [homebrew](//brew.sh) to install the compiler (only):
-
-```
-brew install codeon-gmbh/software/mulle-clang
-```
-
-> If for some reason homebrew can not use the bottle, the compiler must be
-> built from source. This takes a long time! On my Macbook Air the build
-> can take an hour or more. Don't build in Debug mode, it may take days
-> and probably won't finish.
-
-
-#### Debian
-
-You can install on Debian (and Ubuntu) with:
-
-```
-OS="`lsb_release -s -c`" \
-curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-10.0.0.0-${OS}-amd64.deb && \
-sudo dpkg --install mulle-clang-10.0.0.0-${OS}-amd64.deb
-```
-
-Debian | Ubuntu| `shasum -b -a 256`
--------|-------|-----------------------------------------------------------------
-trusty | xenial| not-yet
-bionic |       | not-yet
-
--->
-
 Afterwards head on over to [mulle-objc](//github.com/mulle-objc) to get the
 runtime libraries.
 

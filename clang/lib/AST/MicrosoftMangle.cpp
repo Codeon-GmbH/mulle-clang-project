@@ -2348,6 +2348,11 @@ void MicrosoftCXXNameMangler::mangleType(const BuiltinType *T, Qualifiers,
   case BuiltinType::ObjCSel:
     mangleArtificialTagType(TTK_Struct, "objc_selector");
     break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol:
+    Out << 'I';
+    break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   case BuiltinType::Id: \

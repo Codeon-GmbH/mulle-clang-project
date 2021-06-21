@@ -3581,6 +3581,33 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
             options::OPT_fno_objc_convert_messages_to_runtime_calls))
       CmdArgs.push_back("-fno-objc-convert-messages-to-runtime-calls");
   }
+  // @mulle-objc@ arguments >
+  if( Runtime.hasMulleMetaABI())
+  {
+      // just do what's not default
+      if( Args.hasArg( options::OPT_fno_objc_tps))
+         CmdArgs.push_back( "-fno-objc-tps");
+      if( Args.hasArg( options::OPT_fno_objc_fcs))
+         CmdArgs.push_back( "-fno-objc-fcs");
+      if( Args.hasArg( options::OPT_fobjc_aam))
+         CmdArgs.push_back( "-fobjc-aam");
+      if (const Arg *A =
+          Args.getLastArg(options::OPT_fobjc_universename_EQ)) {
+          A->render(Args, CmdArgs);
+      }
+      if( Args.hasArg( options::OPT_fobjc_classcall_use_self))
+         CmdArgs.push_back( "-fobjc-classcall-use-self");
+      if( Args.hasArg( options::OPT_fobjc_classcall_init_use_self))
+         CmdArgs.push_back( "-fobjc-classcall-init-use-self");
+
+      Args.ClaimAllArgs(options::OPT_fobjc_tps);
+      Args.ClaimAllArgs(options::OPT_fobjc_fcs);
+      Args.ClaimAllArgs(options::OPT_fno_objc_aam);
+
+      Args.ClaimAllArgs(options::OPT_fobjc_universename_EQ);
+      Args.ClaimAllArgs(options::OPT_fno_objc_classcall_use_self);
+  }
+  // @mulle-objc@ arguments <
 
   // -fobjc-infer-related-result-type is the default, except in the Objective-C
   // rewriter.
@@ -5735,6 +5762,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                     options::OPT_fno_assume_sane_operator_new))
     CmdArgs.push_back("-fno-assume-sane-operator-new");
 
+// @mulle-objc@ blocks are just no good for mulle-clang>
+#if 0
   // -fblocks=0 is default.
   if (Args.hasFlag(options::OPT_fblocks, options::OPT_fno_blocks,
                    TC.IsBlocksDefault()) ||
@@ -5750,6 +5779,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // -fencode-extended-block-signature=1 is default.
   if (TC.IsEncodeExtendedBlockSignatureDefault())
     CmdArgs.push_back("-fencode-extended-block-signature");
+#endif
+// @mulle-objc@ blocks are just no good for mulle-clang<
 
   if (Args.hasFlag(options::OPT_fcoroutines_ts, options::OPT_fno_coroutines_ts,
                    false) &&
@@ -6648,10 +6679,9 @@ ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
       getToolChain().getDriver().Diag(diag::err_drv_clang_unsupported) << value;
   } else {
     // Otherwise, determine if we are using the non-fragile ABI.
-    bool nonFragileABIIsDefault =
-        (rewriteKind == RK_NonFragile ||
-         (rewriteKind == RK_None &&
-          getToolChain().IsObjCNonFragileABIDefault()));
+    // @mulle-objc@ nonFragile is always default false >
+    bool nonFragileABIIsDefault = false;
+    // @mulle-objc@ nonFragile is always default false <
     if (args.hasFlag(options::OPT_fobjc_nonfragile_abi,
                      options::OPT_fno_objc_nonfragile_abi,
                      nonFragileABIIsDefault)) {

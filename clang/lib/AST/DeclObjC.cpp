@@ -647,6 +647,29 @@ ObjCIvarDecl *ObjCInterfaceDecl::lookupInstanceVariable(IdentifierInfo *ID,
   return nullptr;
 }
 
+// @mulle-objc@ language: compatible lookup of instance variable for property >
+ObjCIvarDecl *ObjCInterfaceDecl::lookupInstanceVariableOfProperty( ASTContext &C,
+                                                                   IdentifierInfo *PropertyName,
+                                                                   ObjCInterfaceDecl *&ClassDeclared)
+{
+   IdentifierInfo   *IvarIdentifier = PropertyName;
+
+   //
+   // this should be somewhere alongside getDefaultSynthIvarName
+   // actually it's kind of curious, that this isn't the proper code
+   // in most cases
+   if( C.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      std::string   underscored;
+
+      underscored = "_" + std::string( IvarIdentifier->getNameStart());
+      IvarIdentifier = &C.Idents.get( underscored);
+   }
+
+   return( lookupInstanceVariable( IvarIdentifier, ClassDeclared));
+}
+// @mulle-objc@ language: compatible lookup of instance variable for property <
+
 /// lookupInheritedClass - This method returns ObjCInterfaceDecl * of the super
 /// class whose name is passed as argument. If it is not one of the super classes
 /// the it returns NULL.
@@ -804,6 +827,12 @@ ObjCMethodDecl::ObjCMethodDecl(
   setOverriding(false);
   setHasSkippedBody(false);
 
+  /// @mulle-objc@ MetaABI: initialize storage of parameter ivars >>>
+  ParamDecl = nullptr;
+  ParamRecord = nullptr;
+  RvalRecord = nullptr;
+  _isMetaABIVoidPointerParam = false;
+  /// @mulle-objc@ MetaABI: initialize storage of parameter ivars <<<
   setImplicit(isImplicitlyDeclared);
 }
 
@@ -1090,6 +1119,26 @@ ObjCMethodFamily ObjCMethodDecl::getMethodFamily() const {
   return family;
 }
 
+// @mulle-objc@ MetaABI: Lookup a _param FieldDecl by Identifier >
+FieldDecl  *ObjCMethodDecl::FindParamRecordField( IdentifierInfo *II)
+{
+   IdentifierInfo   *FII;
+
+   if( ! ParamRecord)
+      return( nullptr);
+
+   for (RecordDecl::field_iterator Field = ParamRecord->field_begin(),
+        FieldEnd = ParamRecord->field_end(); Field != FieldEnd; ++Field)
+   {
+      FII = Field->getIdentifier();
+      if( FII == II)
+         return( Field->getCanonicalDecl());
+   }
+   return( nullptr);
+}
+// @mulle-objc@ MetaABI: Lookup a _param FieldDecl by Identifier <
+
+
 QualType ObjCMethodDecl::getSelfType(ASTContext &Context,
                                      const ObjCInterfaceDecl *OID,
                                      bool &selfIsPseudoStrong,
@@ -1144,6 +1193,10 @@ void ObjCMethodDecl::createImplicitParams(ASTContext &Context,
                                          &Context.Idents.get("self"), selfTy,
                                          ImplicitParamDecl::ObjCSelf);
   setSelfDecl(Self);
+  // @mulle-objc@ declare self as non-null >
+  if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      Self->addAttr( NonNullAttr::CreateImplicit( Context, 0, 0));
+  // @mulle-objc@ declare self as non-null <
 
   if (selfIsConsumed)
     Self->addAttr(NSConsumedAttr::CreateImplicit(Context));
@@ -1349,6 +1402,17 @@ ObjCMethodDecl::findPropertyDecl(bool CheckOverrides) const {
                                       : I->getSetterName();
           if (NextSel == Sel)
             return I;
+
+          // @mulle-objc@ new property attribute container >
+          if( ! IsGetter)
+          {
+            if (I->getAdderName() == Sel)
+               return I;
+            if (I->getRemoverName() == Sel)
+               return I;
+          }
+          // @mulle-objc@ new property attribute container <
+
         }
       } else {
         for (const auto *I : Container->class_properties()) {
@@ -1356,6 +1420,16 @@ ObjCMethodDecl::findPropertyDecl(bool CheckOverrides) const {
                                       : I->getSetterName();
           if (NextSel == Sel)
             return I;
+
+          // @mulle-objc@ new property attribute container >
+          if( ! IsGetter)
+          {
+            if (I->getAdderName() == Sel)
+               return I;
+            if (I->getRemoverName() == Sel)
+               return I;
+          }
+          // @mulle-objc@ new property attribute container <
         }
       }
 
@@ -1689,6 +1763,39 @@ ObjCIvarDecl *ObjCInterfaceDecl::all_declared_ivar_begin() {
   }
   return data().IvarList;
 }
+
+
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix >
+// could cache this value
+std::string
+ObjCInterfaceDecl::getIvarHashString( ASTContext &C) const
+{
+  std::string   concat;
+
+  for (const ObjCIvarDecl *Ivar = all_declared_ivar_begin(); Ivar;
+       Ivar = Ivar->getNextIvar())
+  {
+      std::string TypeStr;
+      QualType PType = Ivar->getType();
+
+      ASTContext::ObjCEncOptions Options = ASTContext::ObjCEncOptions()
+                               .setExpandPointedToStructures()
+                               .setExpandStructures()
+                               .setIsOutermostType();
+
+      C.getObjCEncodingForTypeImpl( PType, TypeStr, Options, nullptr);
+      /* superflous, but make look nicey */
+      if( concat.size())
+         concat = concat + ',';
+      concat = concat + Ivar->getNameAsString();
+      concat = concat + ":";
+      concat = concat + TypeStr;
+  }
+
+  return concat;
+}
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix <
+
 
 /// FindCategoryDeclaration - Finds category declaration in the list of
 /// categories for this class and returns it. Name of the category is passed

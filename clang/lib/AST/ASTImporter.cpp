@@ -5116,6 +5116,21 @@ ExpectedDecl ASTNodeImporter::VisitObjCPropertyDecl(ObjCPropertyDecl *D) {
   ToProperty->setSetterName(ToSetterName, ToSetterNameLoc);
   ToProperty->setGetterMethodDecl(ToGetterMethodDecl);
   ToProperty->setSetterMethodDecl(ToSetterMethodDecl);
+  // @mulle-objc@ new property attributes container >
+  auto ToAdderName = importChecked(Err, D->getAdderName());
+  auto ToRemoverName = importChecked(Err, D->getRemoverName());
+  auto ToAdderNameLoc = importChecked(Err, D->getAdderNameLoc());
+  auto ToRemoverNameLoc = importChecked(Err, D->getRemoverNameLoc());
+  auto ToAdderMethodDecl = importChecked(Err, D->getAdderMethodDecl());
+  auto ToRemoverMethodDecl = importChecked(Err, D->getRemoverMethodDecl());
+  if (Err)
+    return std::move(Err);
+
+  ToProperty->setAdderName(ToAdderName, ToAdderNameLoc);
+  ToProperty->setRemoverName(ToRemoverName, ToRemoverNameLoc);
+  ToProperty->setAdderMethodDecl(ToAdderMethodDecl);
+  ToProperty->setRemoverMethodDecl(ToRemoverMethodDecl);
+  // @mulle-objc@ new property attributes container <
   ToProperty->setPropertyIvarDecl(ToPropertyIvarDecl);
   return ToProperty;
 }
@@ -8238,7 +8253,7 @@ Expected<Attr *> ASTImporter::Import(const Attr *FromAttr) {
     break;
   }
   assert(ToAttr && "Attribute should be created.");
-  
+
   return ToAttr;
 }
 

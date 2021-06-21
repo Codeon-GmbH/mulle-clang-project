@@ -2801,6 +2801,10 @@ void X86_64ABIInfo::classify(QualType Ty, uint64_t OffsetBase,
       Hi = Integer;
     } else if (k >= BuiltinType::Bool && k <= BuiltinType::LongLong) {
       Current = Integer;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL and SEL >
+    } else if (k == BuiltinType::ObjCSel || k == BuiltinType::ObjCProtocol) {
+       Current = Integer;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL and SEL <
     } else if (k == BuiltinType::Float || k == BuiltinType::Double) {
       Current = SSE;
     } else if (k == BuiltinType::LongDouble) {

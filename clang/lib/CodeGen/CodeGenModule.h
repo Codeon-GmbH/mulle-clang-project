@@ -80,6 +80,9 @@ class Module;
 class CoverageSourceInfo;
 class TargetAttr;
 class InitSegAttr;
+// @mulle-objc@ add Parser to namespace >
+class Parser;
+// @mulle-objc@ add Parser to namespace <
 struct ParsedTargetAttr;
 
 namespace CodeGen {
@@ -1217,6 +1220,10 @@ public:
   void setFunctionLinkage(GlobalDecl GD, llvm::Function *F) {
     F->setLinkage(getFunctionLinkage(GD));
   }
+
+  /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished >
+  void ParserDidFinish( clang::Parser *P);
+  /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished <
 
   /// Return the appropriate linkage for the vtable, VTT, and type information
   /// of the given class.

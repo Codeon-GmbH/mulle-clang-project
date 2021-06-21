@@ -860,6 +860,9 @@ void PrintPreambleAction::ExecuteAction() {
   case Language::C:
   case Language::CXX:
   case Language::ObjC:
+  // @mulle-objc@ AAM:  .aam filename extension support >
+  case Language::ObjCAAM:
+  // @mulle-objc@ AAM:  .aam filename extension support <
   case Language::ObjCXX:
   case Language::OpenCL:
   case Language::CUDA:

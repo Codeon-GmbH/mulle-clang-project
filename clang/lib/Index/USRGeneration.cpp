@@ -763,7 +763,17 @@ void USRGenerator::VisitType(QualType T) {
           c = 'o'; break;
         case BuiltinType::ObjCClass:
           c = 'O'; break;
+        /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+        case BuiltinType::ObjCProtocol:
+        /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
         case BuiltinType::ObjCSel:
+        /// @mulle-objc@ uniqueid: change type of sel and protocol to long >
+          if( Ctx.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          {
+             c = 'l';
+             return;
+          }
+        /// @mulle-objc@ uniqueid: change type of sel and protocol to long >
           c = 'e'; break;
       }
       Out << c;

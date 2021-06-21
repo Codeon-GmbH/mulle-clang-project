@@ -4961,6 +4961,14 @@ void ASTReader::InitializeContext() {
       if (Context.ObjCSelRedefinitionType.isNull())
         Context.ObjCSelRedefinitionType = GetType(ObjCSelRedef);
     }
+     
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    if (unsigned ObjCProtocolRedef
+          = SpecialTypes[SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION]) {
+      if (Context.ObjCPROTOCOLRedefinitionType.isNull())
+        Context.ObjCPROTOCOLRedefinitionType = GetType(ObjCProtocolRedef);
+    }
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
     if (unsigned Ucontext_t = SpecialTypes[SPECIAL_TYPE_UCONTEXT_T]) {
       QualType Ucontext_tType = GetType(Ucontext_t);
@@ -7003,6 +7011,12 @@ QualType ASTReader::GetType(TypeID ID) {
     case PREDEF_TYPE_OBJC_SEL:
       T = Context.ObjCBuiltinSelTy;
       break;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case PREDEF_TYPE_OBJC_PROTOCOL:
+      T = Context.ObjCBuiltinProtocolTy;
+      break;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+          
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
     case PREDEF_TYPE_##Id##_ID: \
       T = Context.SingletonId; \
@@ -7359,7 +7373,9 @@ static Decl *getPredefinedDecl(ASTContext &Context, PredefinedDeclIDs ID) {
     return Context.getObjCClassDecl();
 
   case PREDEF_DECL_OBJC_PROTOCOL_ID:
-    return Context.getObjCProtocolDecl();
+   // @mulle-objc@ change to PROTOCOL >
+    return Context.getObjCPROTOCOLDecl();
+   // @mulle-objc@ change to PROTOCOL <
 
   case PREDEF_DECL_INT_128_ID:
     return Context.getInt128Decl();

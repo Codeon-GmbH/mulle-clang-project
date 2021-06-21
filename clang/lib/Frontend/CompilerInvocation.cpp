@@ -1748,6 +1748,9 @@ static InputKind ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                 .Case("hip", Language::HIP)
                 .Case("c++", Language::CXX)
                 .Case("objective-c", Language::ObjC)
+                // @mulle-objc@ AAM:  .aam filename extension support >
+                .Case("objective-c-aam", Language::ObjCAAM)
+                // @mulle-objc@ AAM:  .aam filename extension support <
                 .Case("objective-c++", Language::ObjCXX)
                 .Case("renderscript", Language::RenderScript)
                 .Default(Language::Unknown);
@@ -1954,6 +1957,14 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     Opts.ObjC = 1;
   }
 
+   // @mulle-objc@ AAM:  .aam filename extension support >
+  if( IK.getLanguage() == Language::ObjCAAM)
+  {
+     Opts.ObjCAllocsAutoreleasedObjects = 1;
+     Opts.ObjC = 1;
+  }
+   // @mulle-objc@ AAM:  .aam filename extension support <
+
   if (LangStd == LangStandard::lang_unspecified) {
     // Based on the base language, pick one.
     switch (IK.getLanguage()) {
@@ -1979,11 +1990,12 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
 #endif
       break;
     case Language::ObjC:
-#if defined(CLANG_DEFAULT_STD_C)
-      LangStd = CLANG_DEFAULT_STD_C;
-#else
-      LangStd = LangStandard::lang_gnu11;
-#endif
+    // @mulle-objc@ AAM: .aam filename extension support ->
+    case Language::ObjCAAM:
+    // @mulle-objc@ AAM: .aam filename extension support -<
+    // @mulle-objc@ C11 should be standard now -<
+      LangStd = LangStandard::lang_c11;
+    // @mulle-objc@ C11 should be standard now -<
       break;
     case Language::CXX:
     case Language::ObjCXX:
@@ -2101,6 +2113,9 @@ static bool IsInputCompatibleWithStandard(InputKind IK,
 
   case Language::C:
   case Language::ObjC:
+  // @mulle-objc@ ObjCAAM >
+  case Language::ObjCAAM:
+  // @mulle-objc@ ObjCAAM
   case Language::RenderScript:
     return S.getLanguage() == Language::C;
 
@@ -2136,6 +2151,10 @@ static const StringRef GetInputKindName(InputKind IK) {
     return "C";
   case Language::ObjC:
     return "Objective-C";
+  // @mulle-objc@ ObjCAAM >
+  case Language::ObjCAAM:
+    return "Objective-C AAM";
+  // @mulle-objc@ ObjCAAM <
   case Language::CXX:
     return "C++";
   case Language::ObjCXX:
@@ -2276,6 +2295,31 @@ void CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
 
+    // @mulle-objc@: handle AAM and TPS options >
+    if( Args.hasArg( OPT_fno_objc_tps))
+      Opts.ObjCDisableTaggedPointers = 1;
+    if( Args.hasArg( OPT_fno_objc_fcs))
+      Opts.ObjCDisableFastCalls = 1;
+
+    StringRef value = Args.getLastArgValue(OPT_fobjc_universename_EQ);
+    if( value.size() != 0)
+    {
+      Opts.ObjCDisableTaggedPointers = 1;
+      Opts.ObjCUniverseName          = value.str();
+
+      // by default in multiverse configuration we use this optimization
+      if( ! Args.hasArg( OPT_fno_objc_classcall_use_self))
+         Opts.ObjCClasscallUseSelf = 1;
+    }
+    if( Args.hasArg( OPT_fobjc_aam))
+      Opts.ObjCAllocsAutoreleasedObjects = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_use_self))
+      Opts.ObjCClasscallUseSelf = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_init_use_self))
+      Opts.ObjCClasscallUseSelf = 2;
+
+    // @mulle-objc@: handle AAM and TPS options <
+
     if (Args.hasArg(OPT_fobjc_gc_only))
       Opts.setGC(LangOptions::GCOnly);
     else if (Args.hasArg(OPT_fobjc_gc))
@@ -2378,8 +2422,13 @@ void CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.RTTI = Opts.CPlusPlus && !Args.hasArg(OPT_fno_rtti);
   Opts.RTTIData = Opts.RTTI && !Args.hasArg(OPT_fno_rtti_data);
+// @mulle-objc@ can not deal with blocks >
+#if 0
   Opts.Blocks = Args.hasArg(OPT_fblocks) || (Opts.OpenCL
     && Opts.OpenCLVersion == 200);
+#endif
+  Opts.BlocksRuntimeOptional = Args.hasArg(OPT_fblocks_runtime_optional);
+// @mulle-objc@ can not deal with blocks <
   Opts.Coroutines = Opts.CPlusPlus20 || Args.hasArg(OPT_fcoroutines_ts);
 
   Opts.ConvergentFunctions = Opts.OpenCL || (Opts.CUDA && Opts.CUDAIsDevice) ||
@@ -2417,6 +2466,9 @@ void CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.AlignedAllocation && Args.hasArg(OPT_aligned_alloc_unavailable);
   if (Args.hasArg(OPT_fconcepts_ts))
     Diags.Report(diag::warn_fe_concepts_ts_flag);
+  // @mulle-objc@ ElideConstructors interferes with C code >
+  Opts.ElideConstructors = 0; // !Args.hasArg(OPT_fno_elide_constructors);
+  // @mulle-objc@ ElideConstructors interferes with C code <
   Opts.MathErrno = !Opts.OpenCL && Args.hasArg(OPT_fmath_errno);
   Opts.LongDoubleSize = Args.hasArg(OPT_mlong_double_128)
                             ? 128

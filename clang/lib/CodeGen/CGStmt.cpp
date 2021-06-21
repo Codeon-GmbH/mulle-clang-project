@@ -1215,13 +1215,28 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
   } else {
     switch (getEvaluationKind(RV->getType())) {
     case TEK_Scalar:
+      // @mulle-objc@ MetaABI: put rval into _param if needed
+      // the duplication of code is stupid, but last time git
+      // killed the other code and I hope this merges better
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         EmitMetaABIWriteReturnValue( CurFuncDecl, RV);
+      else
       Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
       break;
     case TEK_Complex:
+      // @mulle-objc@ MetaABI: put rval into _param if needed
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         EmitMetaABIWriteReturnValue( CurFuncDecl, RV);
+      else
       EmitComplexExprIntoLValue(RV, MakeAddrLValue(ReturnValue, RV->getType()),
                                 /*isInit*/ true);
       break;
     case TEK_Aggregate:
+      // @mulle-objc@ MetaABI: put rval into _param if needed >
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         EmitMetaABIWriteReturnValue( CurFuncDecl, RV);
+      else
+      // @mulle-objc@ MetaABI: put rval into _param if needed <
       EmitAggExpr(RV, AggValueSlot::forAddr(
                           ReturnValue, Qualifiers(),
                           AggValueSlot::IsDestructed,

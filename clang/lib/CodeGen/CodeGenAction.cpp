@@ -386,6 +386,13 @@ namespace clang {
       ((BackendConsumer*)Context)->InlineAsmDiagHandler2(SM, Loc);
     }
 
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished >
+    void ParserDidFinish( Parser *P) override {
+        if( Gen)
+           Gen->ParserDidFinish( P);
+    }
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished <
+
     /// Get the best possible source location to represent a diagnostic that
     /// may have associated debug info.
     const FullSourceLoc

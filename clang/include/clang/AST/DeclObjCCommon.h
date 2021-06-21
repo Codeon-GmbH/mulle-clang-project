@@ -40,6 +40,18 @@ enum Kind {
   kind_class = 0x4000,
   kind_direct = 0x8000,
   // Adding a property should change NumObjCPropertyAttrsBits
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
+  kind_dynamic         = 0x10000,
+  kind_serializable    = 0x20000,
+  kind_nonserializable = 0x40000,
+  kind_container       = 0x80000,
+  kind_relationship    = 0x100000,
+  kind_observable      = 0x200000,
+  kind_adder           = 0x400000,
+  kind_remover         = 0x800000,
+  // MEMO: change NumPropertyAttrsBits below when adding
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
+
   // Also, don't forget to update the Clang C API at CXObjCPropertyAttrKind and
   // clang_Cursor_getObjCPropertyAttributes.
 };
@@ -47,7 +59,9 @@ enum Kind {
 
 enum {
   /// Number of bits fitting all the property attributes.
-  NumObjCPropertyAttrsBits = 16
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
+  NumObjCPropertyAttrsBits = 24
+  // @mulle-objc@ new property attributes serializable, container, dynamic <};
 };
 
 } // namespace clang

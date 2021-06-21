@@ -32,12 +32,15 @@ void CodeGen::addDefaultFunctionDefinitionAttributes(CodeGenModule &CGM,
   CGM.addDefaultFunctionDefinitionAttributes(attrs);
 }
 
+// @mulle-objc@ added isSuper to arrangeObjCMessageSendSignature >
 const CGFunctionInfo &
 CodeGen::arrangeObjCMessageSendSignature(CodeGenModule &CGM,
                                          const ObjCMethodDecl *MD,
-                                         QualType receiverType) {
-  return CGM.getTypes().arrangeObjCMessageSendSignature(MD, receiverType);
+                                         QualType receiverType,
+                                         bool isSuper) {
+  return CGM.getTypes().arrangeObjCMessageSendSignature(MD, receiverType, isSuper);
 }
+// @mulle-objc@ added isSuper to arrangeObjCMessageSendSignature <
 
 const CGFunctionInfo &
 CodeGen::arrangeFreeFunctionType(CodeGenModule &CGM,

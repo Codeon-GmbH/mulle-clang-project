@@ -404,7 +404,7 @@ llvm::DIFile *CGDebugInfo::getOrCreateFile(SourceLocation Loc) {
   } else {
     PresumedLoc PLoc = SM.getPresumedLoc(Loc);
     FileName = PLoc.getFilename();
-    
+
     if (FileName.empty()) {
       FileName = TheCU->getFile()->getFilename();
     } else {
@@ -581,7 +581,13 @@ void CGDebugInfo::CreateCompileUnit() {
   // Figure out which version of the ObjC runtime we have.
   unsigned RuntimeVers = 0;
   if (LO.ObjC)
+  /// @mulle-objc@ change debug RuntimeVers to Mulle (48) >
+  {
     RuntimeVers = LO.ObjCRuntime.isNonFragile() ? 2 : 1;
+    if( LO.ObjCRuntime.hasMulleMetaABI())
+      RuntimeVers = 48;
+  }
+  /// @mulle-objc@ change debug RuntimeVers to Mulle (48) <
 
   llvm::DICompileUnit::DebugEmissionKind EmissionKind;
   switch (DebugKind) {
@@ -671,6 +677,16 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
           DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
                                      "objc_class", TheCU, TheCU->getFile(), 0);
 
+     // @mulle-objc@ :: hack out isa from debug info ->
+    if( CGM.getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+       ObjTy = DBuilder.createStructType(
+           TheCU, "objc_object", TheCU->getFile(), 0, 0, 0,
+           llvm::DINode::FlagZero, nullptr, llvm::DINodeArray());
+
+      return ObjTy;
+    }
+    // @mulle-objc@ :: hack out isa from debug info <-
     unsigned Size = CGM.getContext().getTypeSize(CGM.getContext().VoidPtrTy);
 
     auto *ISATy = DBuilder.createPointerType(ClassTy, Size);
@@ -685,6 +701,8 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
                    llvm::DINode::FlagZero, ISATy)));
     return ObjTy;
   }
+
+  // @mulle-objc@ :: we keep SEL fake like this for the lldb debugger
   case BuiltinType::ObjCSel: {
     if (!SelTy)
       SelTy = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
@@ -692,6 +710,14 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
                                          TheCU->getFile(), 0);
     return SelTy;
   }
+
+  // @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol: {
+     uint64_t Size = CGM.getContext().getTypeSize(BT);
+     BTName = "unsigned int";
+     return DBuilder.createBasicType( BTName, Size, llvm::dwarf::DW_ATE_unsigned);
+  }
+  // @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix)                   \
   case BuiltinType::Id:                                                        \
@@ -2487,6 +2513,14 @@ static bool hasDefaultSetterName(const ObjCPropertyDecl *PD,
   return SelectorTable::constructSetterName(PD->getName()) ==
          Setter->getDeclName().getObjCSelector().getNameForSlot(0);
 }
+
+// @mulle-objc@ new property attributes serializable, container, dynamic >
+// MEMO: CAN'T DO THIS AS WE CAN'T CHANGE DEBUG INFO TOO MUCH
+// static bool hasDefaultAdderName(const ObjCPropertyDecl *PD,
+//                                 const ObjCMethodDecl *Adder);
+// static bool hasDefaultRemoverName(const ObjCPropertyDecl *PD,
+//                                    const ObjCMethodDecl *Remover);
+// @mulle-objc@ new property attributes serializable, container, dynamic <
 
 llvm::DIType *CGDebugInfo::CreateType(const ObjCInterfaceType *Ty,
                                       llvm::DIFile *Unit) {
@@ -4427,6 +4461,41 @@ void CGDebugInfo::EmitDeclareOfArgVariable(const VarDecl *VD, llvm::Value *AI,
   assert(CGM.getCodeGenOpts().hasReducedDebugInfo());
   EmitDeclare(VD, AI, ArgNo, Builder);
 }
+
+///@mulle-clang@ emit debugger info for MetaABI >
+void CGDebugInfo::EmitDeclareOfMetaABIArgVariable(const FieldDecl *Field,
+                                                  unsigned idx,
+                                                  llvm::Value *Storage,
+                                                  CGBuilderTy &Builder) {
+  assert(DebugKind >= codegenoptions::LimitedDebugInfo);
+  llvm::DIFile *Unit = getOrCreateFile(Field->getLocation());
+  llvm::DIType *FieldTy = getOrCreateType(Field->getType(), Unit);
+  StringRef FieldName = Field->getName();
+
+  SmallVector<int64_t, 4> Expr;
+
+  unsigned AddressSpace = CGM.getContext().getTargetAddressSpace(Field->getType());
+  AppendAddressSpaceXDeref(AddressSpace, Expr);
+
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero | llvm::DINode::FlagArtificial;
+
+  // Use VarDecl's Tag, Scope and Line number.
+  auto *Scope = cast<llvm::DIScope>(LexicalBlockStack.back());
+  unsigned Line = getLineNumber(Field->getLocation());
+  unsigned Column = getColumnNumber(Field->getLocation());
+  // auto FieldAlign = getDeclAlignIfRequired(Field, CGM.getContext());
+  // +3 for self, _cmd, _param, +1 because it starts with 1
+  auto *D = DBuilder.createParameterVariable(
+                      Scope, FieldName, idx + 3 + 1, Unit, Line, FieldTy,
+                      CGM.getLangOpts().Optimize ? false : true, Flags);
+
+  // Insert an llvm.dbg.declare into the current block.
+  DBuilder.insertDeclare(
+      Storage, D, DBuilder.createExpression(Expr),
+      llvm::DILocation::get(CGM.getLLVMContext(), Line, Column, Scope, CurInlinedAt),
+      Builder.GetInsertBlock());
+}
+///@mulle-clang@ emit debugger info for MetaABI <
 
 namespace {
 struct BlockLayoutChunk {

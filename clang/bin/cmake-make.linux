@@ -1,0 +1,26 @@
+#! /bin/sh
+
+# It's assumed that the mono repo is unpacked in the current directory as
+# mulle-clang-project. Lets build it in 'build'.
+#
+# If you are in a docker container or VM or otherwise a fresh install use
+# mulle-clang-project/clang/bin/install-prerequisites
+#
+# MEMO: If you can't use ninja copy this file and make it cmake-make or so.
+
+[ ! -d build ] && mkdir build
+cd build &&
+cmake \
+   -DLLVM_ENABLE_PROJECTS="clang;libcxx;libcxxabi" \
+   -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
+   -DCMAKE_EXE_LINKER_FLAGS="-Wl,--reduce-memory-overheads" \
+   -DCMAKE_INSTALL_PREFIX="${PREFIX:-/opt}/mulle-clang-project/${NAME:-12.0.0.0}" \
+   -DCLANG_VENDOR='mulle' \
+   -DCMAKE_INSTALL_MESSAGE='LAZY' \
+   -G "Unix Makefiles" \
+   ../mulle-clang-project/llvm &&
+make -j 6 &&
+echo "Make install with sudo may require a password" >&2 &&
+${INSTALL_SUDO} make install
+
+# pass in INSTALL_SUDO via env if needed

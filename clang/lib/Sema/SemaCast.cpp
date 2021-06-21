@@ -2855,9 +2855,14 @@ void CastOperation::CheckCStyleCast() {
   // Note that member pointers were filtered out with C++, above.
 
   if (isa<ObjCSelectorExpr>(SrcExpr.get())) {
+    /// @mulle-objc@ compiler: allow selector casting in mulle-objc (why not?) ->
+    if( ! Self.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
     Self.Diag(SrcExpr.get()->getExprLoc(), diag::err_cast_selector_expr);
     SrcExpr = ExprError();
     return;
+    }
+    /// @mulle-objc@ compiler: allow selector casting in mulle-objc <-
   }
 
   // Can't cast to or from bfloat

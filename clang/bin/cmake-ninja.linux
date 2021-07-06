@@ -11,7 +11,7 @@
 [ ! -d build ] && mkdir build
 cd build &&
 cmake \
-   -DLLVM_ENABLE_PROJECTS="clang;libcxx;libcxxabi" \
+   -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx;compiler-rt;clang" \
    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
    -DCMAKE_EXE_LINKER_FLAGS="-Wl,--reduce-memory-overheads" \
    -DCMAKE_INSTALL_PREFIX="${PREFIX:-/opt}/mulle-clang-project/${NAME:-12.0.0.0}" \

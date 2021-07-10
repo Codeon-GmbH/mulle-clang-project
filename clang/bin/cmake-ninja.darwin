@@ -1,7 +1,8 @@
 #! /bin/sh
 
-# It's assumed that the mono repo is unpacked in the current directory as
-# mulle-clang-project. Lets build it in 'build'.
+# It's assumed that the mono repo is unpacked in the current directory.
+# Lets build it in 'build' inside of the unpacked repository (different
+# to linux)
 #
 # If you are in a docker container or VM or otherwise a fresh install use
 # mulle-clang-project/clang/bin/install-prerequisites
@@ -17,7 +18,7 @@ cmake \
    -DCLANG_VENDOR='mulle' \
    -DCMAKE_INSTALL_MESSAGE='LAZY' \
    -G Ninja \
-   ../mulle-clang-project/llvm &&
+   ../llvm &&
 ninja &&
 echo "Ninja install with sudo may require a password" >&2 &&
 ${INSTALL_SUDO} ninja install

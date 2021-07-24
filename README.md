@@ -2,9 +2,9 @@
 
 # mulle-clang
 
-This is an Objective-C compiler based on clang 11.0.0, written for the
+This is an Objective-C compiler based on clang 12.0.0, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
-runtime. It corresponds to mulle-objc-runtime v0.18 or better.
+runtime. It corresponds to mulle-objc-runtime v0.19 or better.
 
 > See [README.txt](README.txt) for more information about clang
 
@@ -68,15 +68,15 @@ The following table represents option pairs, that logically exclude each other.
 Either one is always defined.
 
 Name                    | Compiler        | Default | Description
-------------------------|-----------------|-------|--------------------
-`__MULLE_OBJC_AAM__`    | .aam file       | -     | AAM is enabled
-`__MULLE_OBJC_NO_AAM__` | .m file         | -     | AAM is not enabled
- &nbsp;                 | &nbsp;          | &nbsp;|
-`__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES   | TPS (tagged pointer support) is enabled
-`__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO    | TPS is not enabled
-&nbsp;                  | &nbsp;          | &nbsp;|
-`__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES   | FCS fast method/class support is enabled
-`__MULLE_OBJC_NO_FCS__` | -fno-objc-fcs   | NO    | FCS is not enabled
+------------------------|-----------------|---------|--------------------
+`__MULLE_OBJC_AAM__`    | .aam file       | -       | AAM is enabled
+`__MULLE_OBJC_NO_AAM__` | .m file         | -       | AAM is not enabled
+ &nbsp;                 | &nbsp;          | &nbsp;  |
+`__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES     | TPS (tagged pointer support) is enabled
+`__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO      | TPS is not enabled
+&nbsp;                  | &nbsp;          | &nbsp;  |
+`__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES     | FCS fast method/class support is enabled
+`__MULLE_OBJC_NO_FCS__` | -fno-objc-fcs   | NO      | FCS is not enabled
 
 
 ## Macros used in Code Generation
@@ -98,7 +98,7 @@ Name                                  | Description
 `MULLE_OBJC_FOUNDATION_VERSION_PATCH` | Patch of version of the Foundation
 `MULLE_OBJC_USER_VERSION_MAJOR`       | User supplied major of version
 `MULLE_OBJC_USER_VERSION_MINOR`       | User supplied minor of version
-`MULLE_OBJC_USER_VERSION_PATCH`       | User supplied patch of version .All these version information values will be stored in the emitted object file.
+`MULLE_OBJC_USER_VERSION_PATCH`       | User supplied patch of version. All these version information values will be stored in the emitted object file.
 `MULLE_OBJC_FASTCLASSHASH_0`          | First unique ID of a fast class
 ... | ...
 `MULLE_OBJC_FASTCLASSHASH_63`         | Last unique ID of a fast class

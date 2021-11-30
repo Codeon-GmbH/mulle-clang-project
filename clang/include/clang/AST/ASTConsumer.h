@@ -26,6 +26,9 @@ namespace clang {
   class VarDecl;
   class FunctionDecl;
   class ImportDecl;
+/// @mulle-objc@ compiler: added ParserDidFinish >
+  class Parser;
+/// @mulle-objc@ compiler: added ParserDidFinish <
 
 /// ASTConsumer - This is an abstract interface that should be implemented by
 /// clients that read ASTs.  This abstraction layer allows the client to be
@@ -143,6 +146,10 @@ public:
   /// body may be parsed anyway if it is needed (for instance, if it contains
   /// the code completion point or is constexpr).
   virtual bool shouldSkipFunctionBody(Decl *D) { return true; }
+
+  /// @mulle-objc@ compiler: added ParserDidFinish >
+  virtual void ParserDidFinish( Parser *P) {}
+  /// @mulle-objc@ compiler: added ParserDidFinish <
 };
 
 } // end namespace clang.

@@ -5367,6 +5367,14 @@ void RewriteObjCFragileABI::RewriteObjCClassMetaData(ObjCImplementationDecl *IDe
     if (ObjCMethodDecl *Setter = Prop->getSetterMethodDecl())
       if (!Setter->isDefined())
         InstanceMethods.push_back(Setter);
+    // @mulle-objc@ new property attribute container >
+    if (ObjCMethodDecl *Adder = PD->getAdderMethodDecl())
+      if (!Adder->isDefined())
+        InstanceMethods.push_back(Adder);
+    if (ObjCMethodDecl *Remover = PD->getRemoverMethodDecl())
+      if (!Remover->isDefined())
+        InstanceMethods.push_back(Remover);
+    // @mulle-objc@ new property attribute container <
   }
   RewriteObjCMethodsMetaData(InstanceMethods.begin(), InstanceMethods.end(),
                              true, "", IDecl->getName(), Result);
@@ -5643,6 +5651,12 @@ void RewriteObjCFragileABI::RewriteObjCCategoryImplDecl(ObjCCategoryImplDecl *ID
       continue;
     if (ObjCMethodDecl *Setter = Prop->getSetterMethodDecl())
       InstanceMethods.push_back(Setter);
+    // @mulle-objc@ new property attribute container >
+    if (ObjCMethodDecl *Adder = PD->getAdderMethodDecl())
+      InstanceMethods.push_back(Adder);
+    if (ObjCMethodDecl *Remover = PD->getRemoverMethodDecl())
+      InstanceMethods.push_back(Remover);
+    // @mulle-objc@ new property attribute container <
   }
   RewriteObjCMethodsMetaData(InstanceMethods.begin(), InstanceMethods.end(),
                              true, "CATEGORY_", FullCategoryName, Result);

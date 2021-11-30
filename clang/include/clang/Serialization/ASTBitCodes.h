@@ -1064,6 +1064,11 @@ enum PredefinedTypeIDs {
   /// \brief The '__bf16' type
   PREDEF_TYPE_BFLOAT16_ID = 73,
 
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  /// The ObjC 'Protocol' type.
+  PREDEF_TYPE_OBJC_PROTOCOL = 74,
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+
 /// OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix)                   \
   PREDEF_TYPE_##Id##_ID,
@@ -1198,13 +1203,21 @@ enum PredefinedDeclIDs {
 
   /// The internal '__type_pack_element' template.
   PREDEF_DECL_TYPE_PACK_ELEMENT_ID = 17,
+
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+/// unfortunately need to edit SPECIAL_TYPE_UCONTEXT_T to 8
+/// and add 1 to NumSpecialTypeIDs
+  PREDEF_DECL_TYPE_OBJC_PROTOCOL_REDEFINITION  = 18,
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 };
 
 /// The number of declaration IDs that are predefined.
 ///
 /// For more information about predefined declarations, see the
 /// \c PredefinedDeclIDs type and the PREDEF_DECL_*_ID constants.
-const unsigned int NUM_PREDEF_DECL_IDS = 18;
+/// @mulle-objc@ uniqueid: up +1 for PREDEF_DECL_TYPE_OBJC_PROTOCOL_REDEFINITION >
+const unsigned int NUM_PREDEF_DECL_IDS = 19;
+/// @mulle-objc@ uniqueid: up +1 for PREDEF_DECL_TYPE_OBJC_PROTOCOL_REDEFINITION <
 
 /// Record of updates for a declaration that was modified after
 /// being deserialized. This can occur within DECLTYPES_BLOCK_ID.

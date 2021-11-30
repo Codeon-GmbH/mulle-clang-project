@@ -1,0 +1,229 @@
+#! /bin/sh
+
+[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+
+
+fail()
+{
+   echo "$*" >&2
+   exit 1
+}
+
+
+get_mulle_clang_version()
+{
+   local src="$1"
+
+   if [ ! -d "${src}" ]
+   then
+      fail "mulle-clang not downloaded yet"
+   fi
+
+   if [ ! -f "${src}/bin/install-mulle-clang" ]
+   then
+      fail "No MULLE_CLANG_VERSION version found in \"${src}\""
+   fi
+
+   grep MULLE_CLANG_VERSION "${src}/bin/install-mulle-clang" | head -1 | sed 's/.*\"\(.*\)\"/\1/'
+}
+
+
+get_runtime_load_version()
+{
+   local src="$1"
+
+   if [ ! -f "${src}/lib/CodeGen/CGObjCMulleRuntime.cpp" ]
+   then
+      fail "\"CGObjCMulleRuntime.cpp\" not found in \"${src}/lib/CodeGen\""
+   fi
+
+   grep COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION "${src}/lib/CodeGen/CGObjCMulleRuntime.cpp" \
+    | head -1 \
+    | awk '{ print $3 }'
+}
+
+
+get_clang_vendor()
+{
+   local src
+
+   src="$1"
+
+   local compiler_version
+   local runtime_load_version
+
+   compiler_version="`get_mulle_clang_version "${src}"`" || exit 1
+   if [ -z "${compiler_version}" ]
+   then
+      fail "Could not determine mulle-clang version"
+   fi
+
+   runtime_load_version="`get_runtime_load_version "${src}"`" || exit 1
+   if [ -z "${runtime_load_version}" ]
+   then
+      fail "Could not determine runtime load version"
+   fi
+
+   echo "mulle-clang ${compiler_version} (runtime-load-version: `eval echo ${runtime_load_version}`)"
+}
+
+
+usage()
+{
+   cat <<EOF >&2
+Usage:
+   mulle-clang-ide [options] [generator]
+
+   Create a build directory containg an IDE project to build mulle-clang. This
+   is useful, when developing/debugging the compiler.
+
+   Use install-mulle-clang --seperate to build llvm first.
+
+Options:
+   --debug     : with debug symbols
+   --release   : for release (default)
+
+Generator:
+   xcode       : produce Clang.xcodeproj
+   sublime     : produce Clang.sublime-project
+
+EOF
+
+   exit 1
+}
+
+
+main()
+{
+   BUILD_DIR="build"
+   PREFIX="${PWD}"
+
+   # different builds for OS Versions on OS X
+   case "`uname -s`" in
+      Darwin)
+         osxversion="`sw_vers -productVersion | cut -d. -f 1-2`"
+         BUILD_DIR="build-${osxversion}"
+         PREFIX="${OWD}/${osxversion}"
+      ;;
+   esac
+
+
+   PATH="${PWD}/bin:${PWD}/${BUILD_DIR}/llvm.d/bin:$PATH"
+   export PATH
+
+   [ ! -x "${BUILD_DIR}/llvm.d/bin/llvm-config" ] && fail "run install-mulle-clang first to build llvm into \"${BUILD_DIR}/llvm.d\""
+   [ -z "`command -v cmake`" ] && fail "cmake not in PATH ($PATH)"
+
+   CONFIGURATION="Debug"
+
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         -h|--help|help)
+            usage
+         ;;
+
+         --debug)
+            CONFIGURATION="Debug"
+         ;;
+
+         --release)
+            CONFIGURATION="Release"
+         ;;
+
+         -*)
+            fail "Unknown option \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+
+   GENERATOR="$1"
+   case "${GENERATOR}" in
+      -h|--help|help)
+         usage
+      ;;
+
+      *code*)
+         GENERATOR="Xcode"
+         SUFFIX="xcode"
+         PROJECT="Clang.xcodeproj"
+         SYSROOT="`xcrun --show-sdk-path`"
+         shift
+      ;;
+
+      *)
+         GENERATOR="Sublime Text 2 - Ninja"
+         SUFFIX="sublime"
+         PROJECT="Clang.sublime-project"
+         [ $# -ne 0 ] && shift
+      ;;
+   esac
+
+
+   DIR="${1:-${BUILD_DIR}/mulle-clang-${SUFFIX}.d}"
+   [ $# -ne 0 ] && shift
+
+   if [ -d "src/llvm/tools/clang" ]
+   then
+      SRC="src/llvm/tools/clang"
+   else
+      SRC="src/mulle-clang"
+   fi
+   SRC="${1:-${SRC}}"
+   [ $# -ne 0 ] && shift
+
+   CLANG_VENDOR="`get_clang_vendor "${SRC}"`"
+   MULLE_CLANG_INSTALL_PREFIX="$PREFIX"
+
+   #
+   # Typisches problem:
+   # -- Performing Test CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG - Success
+   # CMake Error at /Volumes/Source/srcL/mulle-clang/build-10.13/llvm.d/lib/cmake/llvm/AddLLVM.cmake:694 (add_executable):
+   #  add_executable cannot create target "clang-tblgen" because an imported
+   #  target with the same name already exists.
+   # Call Stack (most recent call first):
+   #  /Volumes/Source/srcL/mulle-clang/build-10.13/llvm.d/lib/cmake/llvm/TableGen.cmake:136 (add_llvm_executable)
+   #  utils/TableGen/CMakeLists.txt:3 (add_tablegen)
+   #
+   # Passiert wohl generell, wenn man den compiler in src/llvm/tools/clang liegen
+   # hat und llvm den dann doppelt includiert. Zum entwickeln muss man also
+   # clang separate compilen und nicht "by the bookl"
+   #
+   mkdir -p "${DIR}" > /dev/null
+   (
+      cd "${DIR}"
+
+      cmake -DCMAKE_OSX_SYSROOT="${SYSROOT}" \
+            -DWITH_POLLY=OFF \
+            -DCLANG_VENDOR="${CLANG_VENDOR}" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
+            -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
+            -DCMAKE_BUILD_TYPE="${CONFIGURATION}" \
+            -DLLVM_MAIN_SRC_DIR="../../src/llvm" \
+            -G "${GENERATOR}" "../../${SRC}"
+
+      if [ $? -ne 0 ]
+      then
+         exit 1
+      fi
+   ) || exit 1
+
+   echo "ln -sf `pwd -P`/${DIR}/${CONFIGURATION}/bin/clang /usr/local/bin/mulle-clang"
+   ln -sf "`pwd -P`/${DIR}/${CONFIGURATION}/bin/clang" "/usr/local/bin/mulle-clang"
+
+   echo "ln -sf `pwd -P`/${DIR}/bin/scan-build /usr/local/bin/mulle-scan-build"
+   ln -sf "`pwd -P`/${DIR}/bin/scan-build" "/usr/local/bin/mulle-scan-build"
+
+   echo ln -sf "${DIR}/${PROJECT}"
+   ln -sf "${DIR}/${PROJECT}"
+}
+
+
+main "$@"

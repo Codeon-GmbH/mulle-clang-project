@@ -2816,7 +2816,7 @@ Sema::GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, SourceLocation Loc)
      DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
      ExprResult BaseExpr = GetMulle_paramExpr( S, Loc, "_param");
      ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
-/*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_RValue);
+/*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_PRValue);
 */
      ExprResult Result   = MemberExpr::Create( Context,
                                               CastExpr.get(),

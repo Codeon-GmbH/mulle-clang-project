@@ -2546,8 +2546,11 @@ static void GenerateFrontendArgs(const FrontendOptions &Opts,
       Lang = "c++";
       break;
     case Language::ObjC:
+// @mulle-objc@ add ObjcAAM >
+    case Language::ObjCAAM:
       Lang = "objective-c";
       break;
+// @mulle-objc@ add ObjcAAM <
     case Language::ObjCXX:
       Lang = "objective-c++";
       break;

@@ -906,7 +906,7 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
 
 llvm::Value   *CodeGenFunction::GetMetaABIParamAddressLValue( const Decl *FuncDecl)
 {
- const ObjCMethodDecl   *MD;
+ const ObjCMethodDecl     *MD;
    RecordDecl             *RD;
    QualType               recordTy;
    QualType               recordPtrTy;
@@ -937,9 +937,7 @@ llvm::Value   *CodeGenFunction::GetMetaABIParamAddressLValue( const Decl *FuncDe
 
    // store ScalarExpr in alloca
    // alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
-   paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param.getPointer(),
-                                                                 getPointerAlign(),
-                                                                 "_param.rval"),
+   paramAddr = Builder.CreateBitCast( Builder.CreateLoad( param, "_param.rval"),
                                       llvmPointerType);
    return( paramAddr);
 }
@@ -1069,7 +1067,7 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
          // emit aggregate expression
          // cast paramAddr to return value...
          alignment = CGM.getContext().getTypeAlignInChars( RV->getType());
-         paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param.getPointer(), alignment, "_param.rval"), getTypes().ConvertTypeForMem( RV->getType())->getPointerTo());
+         paramAddr = Builder.CreateBitCast( Builder.CreateLoad( param, "_param.rval"), getTypes().ConvertTypeForMem( RV->getType())->getPointerTo());
 
          EmitAggExpr(RV, AggValueSlot::forAddr( CodeGen::Address( paramAddr, alignment),
                                                 Qualifiers(),
@@ -1868,7 +1866,7 @@ void CodeGenFunction::emitObjCSetterBodyStatement( ObjCIvarRefExpr &ivarRef, Qua
 {
    ImplicitCastExpr argLoad(ImplicitCastExpr::OnStack,
                             argType.getUnqualifiedType(), CK_LValueToRValue,
-                            expr, VK_RValue, FPOptionsOverride());
+                            expr, VK_PRValue, FPOptionsOverride());
 
    // The property type can differ from the ivar type in some situations with
    // Objective-C pointer types, we can always bit cast the RHS in these cases.
@@ -1891,14 +1889,14 @@ void CodeGenFunction::emitObjCSetterBodyStatement( ObjCIvarRefExpr &ivarRef, Qua
    }
    ImplicitCastExpr argCast(ImplicitCastExpr::OnStack,
                             ivarRef.getType(), argCK, &argLoad,
-                            VK_RValue,FPOptionsOverride());
+                            VK_PRValue,FPOptionsOverride());
    Expr *finalArg = &argLoad;
    if (!getContext().hasSameUnqualifiedType(ivarRef.getType(),
                                             argLoad.getType()))
       finalArg = &argCast;
 
   BinaryOperator *assign = BinaryOperator::Create(
-      getContext(), &ivarRef, finalArg, BO_Assign, ivarRef.getType(), VK_RValue,
+      getContext(), &ivarRef, finalArg, BO_Assign, ivarRef.getType(), VK_PRValue,
       OK_Ordinary, SourceLocation(), FPOptionsOverride());
 
    EmitStmt(assign);

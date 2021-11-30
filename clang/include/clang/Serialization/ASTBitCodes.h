@@ -1136,12 +1136,19 @@ enum SpecialTypeIDs {
   /// Objective-C "SEL" redefinition type
   SPECIAL_TYPE_OBJC_SEL_REDEFINITION = 6,
 
+  /// @mulle-objc@ Objective-C "PROTOCOL" redefinition type >
+  /// also change NumSpecialTypeIDs
+  SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION = 7,
+  /// @mulle-objc@  Objective-C "PROTOCOL" redefinition type <
+
   /// C ucontext_t typedef type
-  SPECIAL_TYPE_UCONTEXT_T = 7
+  SPECIAL_TYPE_UCONTEXT_T = 8
 };
 
 /// The number of special type IDs.
-const unsigned NumSpecialTypeIDs = 8;
+/// @mulle-objc@ Objective-C "PROTOCOL" redefinition type >
+const unsigned NumSpecialTypeIDs = 9;
+/// @mulle-objc@ Objective-C "PROTOCOL" redefinition type <
 
 /// Predefined declaration IDs.
 ///
@@ -1203,21 +1210,13 @@ enum PredefinedDeclIDs {
 
   /// The internal '__type_pack_element' template.
   PREDEF_DECL_TYPE_PACK_ELEMENT_ID = 17,
-
-/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
-/// unfortunately need to edit SPECIAL_TYPE_UCONTEXT_T to 8
-/// and add 1 to NumSpecialTypeIDs
-  PREDEF_DECL_TYPE_OBJC_PROTOCOL_REDEFINITION  = 18,
-/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 };
 
 /// The number of declaration IDs that are predefined.
 ///
 /// For more information about predefined declarations, see the
 /// \c PredefinedDeclIDs type and the PREDEF_DECL_*_ID constants.
-/// @mulle-objc@ uniqueid: up +1 for PREDEF_DECL_TYPE_OBJC_PROTOCOL_REDEFINITION >
-const unsigned int NUM_PREDEF_DECL_IDS = 19;
-/// @mulle-objc@ uniqueid: up +1 for PREDEF_DECL_TYPE_OBJC_PROTOCOL_REDEFINITION <
+const unsigned int NUM_PREDEF_DECL_IDS = 18;
 
 /// Record of updates for a declaration that was modified after
 /// being deserialized. This can occur within DECLTYPES_BLOCK_ID.

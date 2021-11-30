@@ -3074,8 +3074,8 @@ CGObjCMulleRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
    RecordDecl  *UD    = CreateMetaABIUnionDecl( CGF, RD, nullptr);
    LValue       Union = GenerateAlloca( CGF, UD);
 
-   uint64_t     size = get_size_of_type( &CGM, Union.getType());
    llvm::Type   *UnionLLVMType = CGF.ConvertTypeForMem( Union.getType());
+   llvm::TypeSize size         = CGM.getDataLayout().getTypeAllocSize(UnionLLVMType);
    llvm::Value  *emitMarker    = CGF.EmitLifetimeStart( size, Union.getPointer( CGF));
 
    llvm::Value   *RecordAddr        = CGF.Builder.CreateConstGEP2_32( UnionLLVMType, Union.getPointer(CGF), 0, 0);
@@ -4221,7 +4221,10 @@ LValue  CGObjCMulleRuntime::GenerateMetaABIRecordAlloca( CodeGenFunction &CGF,
    // do this always, so that the optimizer can get rid of it
    //
    Marker.Addr  = Union.getPointer(CGF);
-   Marker.SizeV = CGF.EmitLifetimeStart( get_size_of_type( &CGM, Union.getType()), Marker.Addr);
+   llvm::Type   *UnionLLVMType = CGF.ConvertTypeForMem( Union.getType());
+   llvm::TypeSize size         = CGM.getDataLayout().getTypeAllocSize(UnionLLVMType);
+
+   Marker.SizeV = CGF.EmitLifetimeStart( size, Marker.Addr);
 
    // now get record out of union again
    RecordDecl::field_iterator   CurField = UD->field_begin();
@@ -4270,7 +4273,7 @@ void   CGObjCMulleRuntime::EmitVoidPtrExpression( CodeGenFunction &CGF,
       TypeSourceInfo *TInfo = CGM.getContext().getTrivialTypeSourceInfo(CGM.getContext().VoidPtrTy, SourceLocation());
       Arg  = CStyleCastExpr::Create( CGM.getContext(),
                                     CGM.getContext().VoidPtrTy,
-                                    VK_RValue,
+                                    VK_PRValue,
                                     CK_IntegralToPointer,
                                     const_cast< Expr *>( Arg),
                                     NULL,

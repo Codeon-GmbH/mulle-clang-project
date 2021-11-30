@@ -4974,7 +4974,7 @@ void ASTReader::InitializeContext() {
 
     /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
     if (unsigned ObjCProtocolRedef
-          = SpecialTypes[PREDEF_DECL_TYPE_OBJC_PROTOCOL_REDEFINITION]) {
+          = SpecialTypes[SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION]) {
       if (Context.ObjCPROTOCOLRedefinitionType.isNull())
         Context.ObjCPROTOCOLRedefinitionType = GetType(ObjCProtocolRedef);
     }

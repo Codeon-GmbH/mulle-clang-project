@@ -1,10 +1,10 @@
-[![Codeon Gmbh](CodeonLogo.png)](//www.codeon.de)
+[![mulle-cc](https://avatars.githubusercontent.com/u/70896078?s=400&u=35dc427f9bb75c52c1d973cc3f895d2d18a461ae&v=4)](https://github.com/mulle-cc)
 
 # mulle-clang
 
-This is an Objective-C compiler based on clang 11.0.0, written for the
+This is an Objective-C compiler based on clang 13.0.0, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
-runtime. It corresponds to mulle-objc-runtime v0.18 or better.
+runtime. It corresponds to mulle-objc-runtime v0.20 or better.
 
 > See [README.txt](README.txt) for more information about clang
 

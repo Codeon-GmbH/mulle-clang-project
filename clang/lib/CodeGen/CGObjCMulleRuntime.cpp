@@ -880,7 +880,9 @@ namespace {
       llvm::DenseMap<  const IdentifierInfo*, llvm::Constant *> SuperIdentifiers;
 
       /// mulle::start
-      /// HashNames - uniqued hashes for debugging.
+      /// HashNames - uniqued hashes
+      /// TODO: only emit those hashes that aren't part of a methodlist,
+      ///       or superid or classid already
       llvm::StringMap<llvm::ConstantInt*> DefinedHashes;
 
       /// IvarNames - uniqued ivar names. We have to use
@@ -5690,7 +5692,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       LoadStrings.push_back( expr);
    }
 
-   if( CGM.getCodeGenOpts().getDebugInfo() >= clang::codegenoptions::LimitedDebugInfo)
+   //if( CGM.getCodeGenOpts().getDebugInfo() >= clang::codegenoptions::LimitedDebugInfo)
    {
       for (llvm::StringMap<llvm::ConstantInt *>::const_iterator
            I = DefinedHashes.begin(), E = DefinedHashes.end();

@@ -6273,6 +6273,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   bool EH = false;
   if (!C.getDriver().IsCLMode())
     EH = addExceptionArgs(Args, InputType, TC, KernelOrKext, Runtime, CmdArgs);
+  // @mulle-objc@ enable ObjC exceptions for CLMode as well >
+  else {
+    CmdArgs.push_back("-fobjc-exceptions");
+  }
+  // @mulle-objc@ enable ObjC exceptions for CLMode as well <
 
   // Handle exception personalities
   Arg *A = Args.getLastArg(

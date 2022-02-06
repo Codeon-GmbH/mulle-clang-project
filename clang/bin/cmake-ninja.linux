@@ -7,6 +7,8 @@
 # mulle-clang-project/clang/bin/install-prerequisites
 #
 # MEMO: If you can't use ninja copy this file and make it cmake-make or so.
+PREFIX="${PREFIX:-/opt}"
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${MULLE_CLANG_VERSION:-13.0.0.2}"
 
 [ ! -d build ] && mkdir build
 cd build &&
@@ -14,7 +16,7 @@ cmake \
    -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx;compiler-rt;clang" \
    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
    -DCMAKE_EXE_LINKER_FLAGS="-Wl,--reduce-memory-overheads" \
-   -DCMAKE_INSTALL_PREFIX="${PREFIX:-/opt}/mulle-clang-project/${NAME:-13.0.0.0}" \
+   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
    -DCLANG_VENDOR='mulle' \
    -DCMAKE_INSTALL_MESSAGE='LAZY' \
    -G Ninja \

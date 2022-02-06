@@ -7,7 +7,6 @@
 # mulle-clang-project/clang/bin/install-prerequisites
 #
 # MEMO: If you can't use ninja copy this file and make it cmake-make or so.
-
 PREFIX="${PREFIX:-${HOME}}"
 INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${MULLE_CLANG_VERSION:-13.0.0.2}"
 
@@ -16,21 +15,24 @@ then
    mkdir -p "${INSTALL_PREFIX}" || exit 1
 fi
 
+
 [ ! -d build ] && mkdir build
+
+# assume on windows, cmake uses the proper VS-Studio version as default, so we don't
+# specify a generator 
 
 cd build &&
 cmake.exe \
+   -Thost=x64 \
    -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx;compiler-rt;clang" \
    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
    -DCMAKE_INSTALL_PREFIX="`wslpath -w "${INSTALL_PREFIX}" `" \
    -DCLANG_VENDOR='mulle' \
    -DCMAKE_INSTALL_MESSAGE='LAZY' \
-   -G Ninja \
    ${CMAKEFLAGS} \
    ../mulle-clang-project/llvm &&
-ninja.exe ${NINJAFLAGS} "$@"  &&
-echo "Ninja install with sudo may require a password" >&2 &&
-${INSTALL_SUDO} ninja.exe ${NINJAFLAGS} ${INSTALLFLAGS} install  &&
+cmake.exe --build . &&
+cmake.exe --install . &&
 (
    cd "${INSTALL_PREFIX}/bin" || exit 1
 

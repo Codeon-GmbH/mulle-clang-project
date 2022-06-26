@@ -59,9 +59,12 @@ struct ImplicitCXXConstructorArgs {
   SmallVector<llvm::Value *, 1> Suffix;
 };
 
+// @mulle-objc@ add isSuper to  arrangeObjCMessageSendSignature >
 const CGFunctionInfo &arrangeObjCMessageSendSignature(CodeGenModule &CGM,
                                                       const ObjCMethodDecl *MD,
-                                                      QualType receiverType);
+                                                      QualType receiverType,
+                                                      bool isSuper = false);
+// @mulle-objc@ add isSuper to  arrangeObjCMessageSendSignature <
 
 const CGFunctionInfo &arrangeFreeFunctionType(CodeGenModule &CGM,
                                               CanQual<FunctionProtoType> Ty);

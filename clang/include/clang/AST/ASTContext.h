@@ -376,6 +376,11 @@ class ASTContext : public RefCountedBase<ASTContext> {
   /// The typedef for the predefined \c Protocol class in Objective-C.
   mutable ObjCInterfaceDecl *ObjCProtocolClassDecl = nullptr;
 
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  /// The typedef for the predefined \c PROTOCOL in Objective-C.
+  mutable TypedefDecl *ObjCPROTOCOLDecl = nullptr;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+
   /// The typedef for the predefined 'BOOL' type.
   mutable TypedefDecl *BOOLDecl = nullptr;
 
@@ -384,6 +389,9 @@ class ASTContext : public RefCountedBase<ASTContext> {
   QualType ObjCIdRedefinitionType;
   QualType ObjCClassRedefinitionType;
   QualType ObjCSelRedefinitionType;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  QualType ObjCPROTOCOLRedefinitionType;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   /// The identifier 'bool'.
   mutable IdentifierInfo *BoolName = nullptr;
@@ -1115,6 +1123,9 @@ public:
   CanQualType BuiltinFnTy;
   CanQualType PseudoObjectTy, ARCUnbridgedCastTy;
   CanQualType ObjCBuiltinIdTy, ObjCBuiltinClassTy, ObjCBuiltinSelTy;
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  CanQualType ObjCBuiltinProtocolTy;
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   CanQualType ObjCBuiltinBoolTy;
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   CanQualType SingletonId;
@@ -1851,6 +1862,21 @@ public:
     ObjCSelRedefinitionType = RedefType;
   }
 
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  /// \brief Retrieve the type that 'PROTOCOL' has been defined to, which may be
+  /// different from the built-in 'PROTOCOL' if 'PROTOCOL' has been typedef'd.
+  QualType getObjCPROTOCOLRedefinitionType() const {
+    if (ObjCPROTOCOLRedefinitionType.isNull())
+      return getObjCPROTOCOLType();
+    return ObjCPROTOCOLRedefinitionType;
+  }
+
+  /// \brief Set the user-written type that redefines 'SEL'.
+  void setObjCPROTOCOLRedefinitionType(QualType RedefType) {
+    ObjCPROTOCOLRedefinitionType = RedefType;
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+
   /// Retrieve the identifier 'NSObject'.
   IdentifierInfo *getNSObjectName() const {
     if (!NSObjectName) {
@@ -1953,6 +1979,10 @@ public:
     return getLangOpts().CPlusPlus ? BoolTy : IntTy;
   }
 
+  /// @mulle-objc@ : MetaABI Helper >
+  bool   typeNeedsMetaABIAlloca( QualType type);
+  /// @mulle-objc@ : MetaABI Helper <
+
   /// Emit the Objective-CC type encoding for the given type \p T into
   /// \p S.
   ///
@@ -1993,6 +2023,19 @@ public:
   /// only be NULL when getting encodings for protocol properties.
   std::string getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
                                              const Decl *Container) const;
+
+   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+   /// \brief Retrieve the Objective-C class declaration corresponding to
+   /// the predefined \c Protocol class.
+   /// @mulle-objc@ compiler: change type of getObjCPROTOCOLDecl
+   TypedefDecl *getObjCPROTOCOLDecl() const;
+
+   /// \brief Retrieve the type that corresponds to the predefined Objective-C
+   /// 'PROTOCOL' type.
+   QualType getObjCPROTOCOLType() const {
+      return getTypeDeclType(getObjCPROTOCOLDecl());
+   }
+   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   bool ProtocolCompatibleWithProtocol(ObjCProtocolDecl *lProto,
                                       ObjCProtocolDecl *rProto) const;
@@ -2060,6 +2103,10 @@ public:
 
   /// Retrieve the type of the Objective-C \c Protocol class.
   QualType getObjCProtoType() const {
+   /// @mulle-objc@ compiler: change type of getObjCPROTOCOLDecl >
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      return getTypeDeclType( (TypedefDecl *) getObjCPROTOCOLDecl());
+   /// @mulle-objc@ compiler: change type of getObjCPROTOCOLDecl <
     return getObjCInterfaceType(getObjCProtocolDecl());
   }
 
@@ -2808,6 +2855,11 @@ public:
   bool ObjCQualifiedIdTypesAreCompatible(const ObjCObjectPointerType *LHS,
                                          const ObjCObjectPointerType *RHS,
                                          bool ForCompare);
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  bool isObjCProtocolType(QualType T) const {
+    return T == getObjCPROTOCOLType();
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   bool ObjCQualifiedClassTypesAreCompatible(const ObjCObjectPointerType *LHS,
                                             const ObjCObjectPointerType *RHS);
@@ -3136,6 +3188,8 @@ public:
 private:
   void InitBuiltinType(CanQualType &R, BuiltinType::Kind K);
 
+// @mulle-objc@ compiler: need getObjCEncodingForTypeImpl and class ObjCEncOptions to be public >
+public:
   class ObjCEncOptions {
     unsigned Bits;
 
@@ -3182,6 +3236,8 @@ OPT_LIST(V)
                                   const FieldDecl *Field,
                                   QualType *NotEncodedT = nullptr) const;
 
+private:
+// @mulle-objc@ compiler: need getObjCEncodingForTypeImpl and class ObjCEncOptions to be public <
   // Adds the encoding of the structure's members.
   void getObjCEncodingForStructureImpl(RecordDecl *RD, std::string &S,
                                        const FieldDecl *Field,

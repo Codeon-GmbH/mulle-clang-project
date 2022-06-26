@@ -1145,6 +1145,18 @@ bool CursorVisitor::VisitObjCPropertyDecl(ObjCPropertyDecl *PD) {
       if (Visit(MakeCXCursor(MD, TU, RegionOfInterest)))
         return true;
 
+  // @mulle-objc@ new property attribute container >
+  if (ObjCMethodDecl *MD = prevDecl->getAdderMethodDecl())
+    if (MD->isPropertyAccessor() && MD->getLexicalDeclContext() == CDecl)
+      if (Visit(MakeCXCursor(MD, TU, RegionOfInterest)))
+        return true;
+
+  if (ObjCMethodDecl *MD = prevDecl->getRemoverMethodDecl())
+    if (MD->isPropertyAccessor() && MD->getLexicalDeclContext() == CDecl)
+      if (Visit(MakeCXCursor(MD, TU, RegionOfInterest)))
+        return true;
+  // @mulle-objc@ new property attribute container <
+
   return false;
 }
 
@@ -1570,6 +1582,12 @@ bool CursorVisitor::VisitBuiltinTypeLoc(BuiltinTypeLoc TL) {
   case BuiltinType::ObjCSel:
     VisitType = Context.getObjCSelType();
     break;
+
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol:
+    VisitType = Context.getObjCPROTOCOLType();
+    break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   }
 
   if (!VisitType.isNull()) {
@@ -8336,6 +8354,33 @@ CXString clang_Cursor_getObjCPropertySetterName(CXCursor C) {
 
   return cxstring::createDup(sel.getAsString());
 }
+
+// @mulle-objc@ new property attribute container >
+CXString clang_Cursor_getObjCPropertyAdderName(CXCursor C) {
+  if (C.kind != CXCursor_ObjCPropertyDecl)
+    return cxstring::createNull();
+
+  const ObjCPropertyDecl *PD = dyn_cast<ObjCPropertyDecl>(getCursorDecl(C));
+  Selector sel = PD->getAdderName();
+  if (sel.isNull())
+    return cxstring::createNull();
+
+  return cxstring::createDup(sel.getAsString());
+}
+
+CXString clang_Cursor_getObjCPropertyRemoverName(CXCursor C) {
+  if (C.kind != CXCursor_ObjCPropertyDecl)
+    return cxstring::createNull();
+
+  const ObjCPropertyDecl *PD = dyn_cast<ObjCPropertyDecl>(getCursorDecl(C));
+  Selector sel = PD->getRemoverName();
+  if (sel.isNull())
+    return cxstring::createNull();
+
+  return cxstring::createDup(sel.getAsString());
+}
+// @mulle-objc@ new property attribute container <
+
 
 unsigned clang_Cursor_getObjCDeclQualifiers(CXCursor C) {
   if (!clang_isDeclaration(C.kind))

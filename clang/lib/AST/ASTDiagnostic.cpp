@@ -160,6 +160,9 @@ QualType clang::desugarForDiagnostic(ASTContext &Context, QualType QT,
     }
 
     // Don't desugar magic Objective-C types.
+    // @mulle-objc@ But only ask if running ObjC for now >
+    if (Context.getLangOpts().ObjC)
+    // @mulle-objc@ But only ask if running ObjC for now <
     if (QualType(Ty,0) == Context.getObjCIdType() ||
         QualType(Ty,0) == Context.getObjCClassType() ||
         QualType(Ty,0) == Context.getObjCSelType() ||

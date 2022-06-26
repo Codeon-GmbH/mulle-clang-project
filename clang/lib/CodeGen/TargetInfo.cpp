@@ -2855,6 +2855,12 @@ void X86_64ABIInfo::classify(QualType Ty, uint64_t OffsetBase,
       Current = Integer;
     } else if (k == BuiltinType::Float || k == BuiltinType::Double ||
                k == BuiltinType::Float16) {
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL and SEL >
+    } else if (k == BuiltinType::ObjCSel || k == BuiltinType::ObjCProtocol) {
+       Current = Integer;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL and SEL <
+    } else if (k == BuiltinType::Float || k == BuiltinType::Double ||
+               k == BuiltinType::Float16) {
       Current = SSE;
     } else if (k == BuiltinType::LongDouble) {
       const llvm::fltSemantics *LDF = &getTarget().getLongDoubleFormat();

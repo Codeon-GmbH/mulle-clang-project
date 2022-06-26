@@ -1,0 +1,61 @@
+#! /bin/sh
+
+# It's assumed that the mono repo is unpacked in the current directory as
+# mulle-clang-project. Lets build it in 'build'.
+#
+# If you are in a docker container or VM or otherwise a fresh install use
+# mulle-clang-project/clang/bin/install-prerequisites
+#
+# MEMO: If you can't use ninja copy this file and make it cmake-make or so.
+PREFIX="${PREFIX:-/opt}"
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${MULLE_CLANG_VERSION:-14.0.6.0}"
+
+[ ! -d build ] && mkdir build
+cd build &&
+cmake \
+   -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx;compiler-rt;clang" \
+   -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
+   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+   -DCLANG_VENDOR='mulle' \
+   -DLLVM_BUILD_LLVM_DYLIB='ON' \
+   -DLLVM_LINK_LLVM_DYLIB=ON \
+   -DCMAKE_INSTALL_MESSAGE='LAZY' \
+   -DCMAKE_EXE_LINKER_FLAGS="-Wl,--reduce-memory-overheads" \
+   -G "Unix Makefiles" \
+   ../mulle-clang-project/llvm &&
+make -j 6 &&
+echo "Make install with sudo may require a password" >&2 &&
+${INSTALL_SUDO} make install || exit 1
+
+# pass in INSTALL_SUDO via env if needed
+
+# postprocess: remove llvm stuff that is not needed
+#              rename llvm stuff we need to m
+
+
+cd "${INSTALL_PREFIX}/bin" &&
+for bin in *
+do
+   case "${bin}" in
+      clang-[0-9]*)
+         ${INSTALL_SUDO} mv "$bin" "mulle-clang" || exit 1
+      ;;
+
+      llvm-nm)
+         ${INSTALL_SUDO} mv "$bin" "mulle-nm" || exit 1
+      ;;
+
+      analyze-build*|scan-build*)
+         ${INSTALL_SUDO} mv "$bin" "mulle-${bin}" || exit 1
+      ;;
+
+      mulle-*)
+         # protection if overwriting old /opt dir with contents
+      ;;
+
+      *)
+         echo "Removing ${bin}" >&2 &&
+         ${INSTALL_SUDO} rm "${bin}" || exit 1
+      ;;
+   esac
+done

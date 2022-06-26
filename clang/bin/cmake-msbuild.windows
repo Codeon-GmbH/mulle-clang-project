@@ -1,0 +1,64 @@
+#! /bin/sh 
+
+# It's assumed that the mono repo is unpacked in the current directory as
+# mulle-clang-project. Lets build it in 'build'.
+#
+# If you are in a docker container or VM or otherwise a fresh install use
+# mulle-clang-project/clang/bin/install-prerequisites
+#
+# MEMO: If you can't use ninja copy this file and make it cmake-make or so.
+PREFIX="${PREFIX:-${HOME}}"
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${MULLE_CLANG_VERSION:-14.0.6.0}"
+
+if [ ! -d "${INSTALL_PREFIX}" ] 
+then 
+   mkdir -p "${INSTALL_PREFIX}" || exit 1
+fi
+
+
+[ ! -d build ] && mkdir build
+
+# assume on windows, cmake uses the proper VS-Studio version as default, so we don't
+# specify a generator 
+
+cd build &&
+cmake.exe \
+   -Thost=x64 \
+   -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx;compiler-rt;clang" \
+   -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
+   -DCMAKE_INSTALL_PREFIX="`wslpath -w "${INSTALL_PREFIX}" `" \
+   -DCLANG_VENDOR='mulle' \
+   -DCMAKE_INSTALL_MESSAGE='LAZY' \
+   ${CMAKEFLAGS} \
+   ../mulle-clang-project/llvm &&
+cmake.exe --build . &&
+cmake.exe --install . &&
+(
+   cd "${INSTALL_PREFIX}/bin" || exit 1
+
+   # remove possible older mulle-stuff from previous build
+   rm mulle-* 2> /dev/null
+
+   # rename stuff we need to mulle
+   mv llvm-nm.exe mulle-nm.exe &&
+
+   for i in scan-build* clang-cl.exe 
+   do
+      mv "$i" mulle-"$i"
+   done &&
+
+   # junk rest
+   for i in *
+   do 
+      case "$i" in 
+         *.dll|mulle-*)
+         ;;
+
+         *)
+            rm "$i" || exit 1
+         ;;
+      esac
+   done
+)
+
+# pass in INSTALL_SUDO via env if needed

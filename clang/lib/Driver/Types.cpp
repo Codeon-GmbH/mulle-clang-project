@@ -145,6 +145,10 @@ bool types::isAcceptedByClang(ID Id) {
   case TY_LLVM_IR: case TY_LLVM_BC:
   case TY_API_INFO:
     return true;
+  // @mulle-objc@ AAM:  .aam filename extension support >
+  case TY_ObjCAAM:
+        return true;
+  // @mulle-objc@ AAM:  .aam filename extension support <
   }
 }
 
@@ -184,6 +188,10 @@ bool types::isDerivedFromC(ID Id) {
   case TY_CXXModule:
   case TY_PP_CXXModule:
     return true;
+  // @mulle-objc@ AAM:  .aam filename extension support >
+  case TY_ObjCAAM:
+        return true;
+  // @mulle-objc@ AAM:  .aam filename extension support <
   }
 }
 
@@ -196,7 +204,10 @@ bool types::isObjC(ID Id) {
   case TY_ObjCXX: case TY_PP_ObjCXX:
   case TY_ObjCHeader: case TY_PP_ObjCHeader:
   case TY_ObjCXXHeader: case TY_PP_ObjCXXHeader: case TY_PP_ObjCXX_Alias:
-    return true;
+  // @mulle-objc@ AAM:  .aam filename extension support >
+  case TY_ObjCAAM:
+        return true;
+  // @mulle-objc@ AAM:  .aam filename extension support <
   }
 }
 
@@ -281,6 +292,9 @@ types::ID types::lookupTypeForExtension(llvm::StringRef Ext) {
            .Case("H", TY_CXXHeader)
            .Case("i", TY_PP_C)
            .Case("m", TY_ObjC)
+           // @mulle-objc@ AAM:  .aam filename extension support >
+           .Case("aam", TY_ObjCAAM)
+           // @mulle-objc@ AAM:  .aam filename extension support <
            .Case("M", TY_ObjCXX)
            .Case("o", TY_Object)
            .Case("S", TY_Asm)

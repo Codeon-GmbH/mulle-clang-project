@@ -1,4 +1,4 @@
-#! /bin/sh 
+#! /bin/sh
 
 # It's assumed that the mono repo is unpacked in the current directory as
 # mulle-clang-project. Lets build it in 'build'.
@@ -8,10 +8,11 @@
 #
 # MEMO: If you can't use ninja copy this file and make it cmake-make or so.
 PREFIX="${PREFIX:-${HOME}}"
-INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${MULLE_CLANG_VERSION:-14.0.6.0}"
+# VERSION / RC are passed in via mulle-clang-cpack
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-14.0.6.0}${RC}"
 
-if [ ! -d "${INSTALL_PREFIX}" ] 
-then 
+if [ ! -d "${INSTALL_PREFIX}" ]
+then
    mkdir -p "${INSTALL_PREFIX}" || exit 1
 fi
 
@@ -19,7 +20,7 @@ fi
 [ ! -d build ] && mkdir build
 
 # assume on windows, cmake uses the proper VS-Studio version as default, so we don't
-# specify a generator 
+# specify a generator
 
 cd build &&
 cmake.exe \
@@ -42,15 +43,15 @@ cmake.exe --install . &&
    # rename stuff we need to mulle
    mv llvm-nm.exe mulle-nm.exe &&
 
-   for i in scan-build* clang-cl.exe 
+   for i in scan-build* clang-cl.exe
    do
       mv "$i" mulle-"$i"
    done &&
 
    # junk rest
    for i in *
-   do 
-      case "$i" in 
+   do
+      case "$i" in
          *.dll|mulle-*)
          ;;
 

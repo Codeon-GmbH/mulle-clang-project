@@ -914,7 +914,6 @@ llvm::Value   *CodeGenFunction::GetMetaABIParamAddressLValue( const Decl *FuncDe
    llvm::Type             *llvmPointerType;
    llvm::Value            *paramAddr;
    //unsigned               alignment ;
-   QualType               longType;
 
    MD = dyn_cast<ObjCMethodDecl>( FuncDecl);
          // return value: wrap scalar in aggregate, return pointer if in method

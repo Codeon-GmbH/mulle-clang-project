@@ -76,3 +76,16 @@ do
       ;;
    esac
 done
+
+#
+# remove more stuff we don't need for the compiler and scanbuild
+# to keep the compiler package down
+#
+${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLLVM*.a
+${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libc++*
+${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang*.a
+${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang.*
+${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.so
+${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLTO.so*
+${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.so*
+${INSTALL_SUDO} rm -rf "${INSTALL_PREFIX}"/include/

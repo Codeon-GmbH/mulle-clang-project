@@ -2,7 +2,7 @@
 
 # mulle-clang
 
-This is an Objective-C compiler based on clang 13.0.0, written for the
+This is an Objective-C compiler based on clang 14.0.6, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
 runtime. It corresponds to mulle-objc-runtime v0.20 or better.
 

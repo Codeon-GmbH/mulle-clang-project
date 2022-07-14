@@ -1302,14 +1302,14 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
       // @mulle-objc@ MetaABI: put rval into _param if needed
       // the duplication of code is stupid, but last time git
       // killed the other code and I hope this merges better
-      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      if( dyn_cast_or_null<ObjCMethodDecl>(CurFuncDecl) && getLangOpts().ObjCRuntime.hasMulleMetaABI())
          EmitMetaABIWriteReturnValue( CurFuncDecl, RV);
       else
       Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
       break;
     case TEK_Complex:
       // @mulle-objc@ MetaABI: put rval into _param if needed
-      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      if( dyn_cast_or_null<ObjCMethodDecl>(CurFuncDecl) && getLangOpts().ObjCRuntime.hasMulleMetaABI())
          EmitMetaABIWriteReturnValue( CurFuncDecl, RV);
       else
       EmitComplexExprIntoLValue(RV, MakeAddrLValue(ReturnValue, RV->getType()),
@@ -1317,7 +1317,7 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
       break;
     case TEK_Aggregate:
       // @mulle-objc@ MetaABI: put rval into _param if needed >
-      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      if( dyn_cast_or_null<ObjCMethodDecl>(CurFuncDecl) && getLangOpts().ObjCRuntime.hasMulleMetaABI())
          EmitMetaABIWriteReturnValue( CurFuncDecl, RV);
       else
       // @mulle-objc@ MetaABI: put rval into _param if needed <

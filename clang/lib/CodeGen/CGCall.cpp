@@ -2865,7 +2865,8 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         assert(NumIRArgs == 1);
 
         // @mulle-objc@ language: make implicit nonnullable in llvm if so desired >
-        if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        if ( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl) &&
+            getLangOpts().ObjCRuntime.hasMulleMetaABI())
         {
           if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
             if (IPD->getAttr<NonNullAttr>())
@@ -2991,18 +2992,15 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         if (V->getType() != LTy)
         {
           // @mulle-objc@ MetaABI: function argument _param, cast from void pointer to uintptr_t (methods only)
-          if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl) && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
           {
-            if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl))
+            if( AI->getArgNo() == 2) // after _cmd
             {
-              if( AI->getArgNo() == 2) // after _cmd
+              // got to be but check anyway, cast it to long
+              if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
               {
-                // got to be but check anyway, cast it to long
-                if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
-                {
-                   V = Builder.CreatePtrToInt( V, ConvertType( getContext().getUIntPtrType()));
-                   V = Builder.CreateIntCast( V, LTy, true);
-                }
+                V = Builder.CreatePtrToInt( V, ConvertType( getContext().getUIntPtrType()));
+                V = Builder.CreateIntCast( V, LTy, true);
               }
             }
           }

@@ -42,9 +42,9 @@ Cloning the repository will take forever and just waste space. The instructions
 here might be stale, so check out what's new and current:
 
 ```
-mkdir mulle-clang-130
-cd mulle-clang-130
-curl -L -O "https://github.com/mulle-cc/mulle-clang-project/archive/refs/tags/13.0.0.2.tar.gz"
+mkdir mulle-clang-140
+cd mulle-clang-140
+curl -L -O "https://github.com/mulle-cc/mulle-clang-project/archive/refs/tags/14.0.6.0.tar.gz"
 ```
 
 #### 2. Install prerequisites
@@ -60,14 +60,12 @@ become stale:
 #### 3. Build and install the compiler
 
 ``` bash
-# look at available scripts
+# look at available scripts, (use cmake-msbuild.windows on windows inside WSL)
 ls mulle-clang-project/clang/bin/*.*
 
 # this will also install,
 INSTALL_SUDO=sudo ./clang/bin/cmake-make.linux
 ```
-
-
 
 
 ## Windows: Installing further prerequisites
@@ -80,7 +78,9 @@ characters and underscores.
 * Nat! : bad
 * i am nat : very bad
 
-## Installing on Windows 10 (probably also 7 and 8)
+## Installing on Windows 10 (probably also 7 and 8) with "Git Bash"
+
+> This is a little bit obsolete. Use WSL to build a "native" compiler for Visual Studio.
 
 * Install [Visual Studio 2015 Community Edition](//beta.visualstudio.com/downloads/) or better (free). Make sure that you install Windows C++ support. Also add git support.
 * [Git for Windows](//git-scm.com/download/win) is included in VS 2015, make sure it's there

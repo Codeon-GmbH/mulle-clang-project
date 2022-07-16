@@ -692,6 +692,24 @@ setup_build_environment()
       fi
    fi
 
+   case "${MULLE_UNAME}" in
+      darwin)
+      ;;
+
+      linux)
+         install_binary_if_missing "valgrind" "https://???"
+#         install_library_if_missing "python-dev" "https://www.python.org/downloads/release"
+         install_library_if_missing "python3-distutils" "https://docs.python.org/3/library/distutils.html"
+         install_library_if_missing "libxml2-dev" "https://xmlsoft.org"
+         install_library_if_missing "libz-dev" "https://???"
+         install_library_if_missing "libtinfo-dev" "https://???"
+      ;;
+
+      *)
+      ;;
+   esac
+
+
    if [ "${BUILD_LLDB}" = "YES" ]
    then
       install_binary_if_missing "swig${BUILD_EXE_EXTENSION}" "https://swig.org/download.html"
@@ -702,10 +720,8 @@ setup_build_environment()
 
          linux)
             # memo: python3-distutils is needed nowadays to avoid ModuleNotFoundError: No module named 'distutils.spawn'
-            install_library_if_missing "python3-distutils" "https://docs.python.org/3/library/distutils.html"
             install_library_if_missing "python-dev" "https://www.python.org/downloads/release"
             install_library_if_missing "libncurses5-dev" "https://www.gnu.org/software/ncurses"
-            install_library_if_missing "libxml2-dev" "https://xmlsoft.org"
             install_library_if_missing "libedit-dev" "https://thrysoee.dk/editline"
          ;;
 

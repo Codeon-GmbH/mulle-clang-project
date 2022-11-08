@@ -1016,6 +1016,7 @@ namespace {
       /// EmitPropertyList - Emit the given property list. The return
       /// value has type PropertyListPtrTy.
       llvm::Constant *EmitPropertyList(Twine Name,
+                                       const char *Section,
                                        const Decl *Container,
                                        const ObjCContainerDecl *OCD,
                                        const ObjCCommonTypesHelper &ObjCTypes);
@@ -1069,7 +1070,7 @@ namespace {
 
       /// EmitImageInfo - Emit the image info marker used to encode some module
       /// level information.
-      void EmitImageInfo();
+      void EmitImageInfo( const char *Section);
 
    public:
       CGObjCCommonMulleRuntime(CodeGen::CodeGenModule &cgm) :
@@ -1141,6 +1142,7 @@ namespace {
       /// interface ivars will be emitted. The return value has type
       /// IvarListPtrTy.
       llvm::Constant *EmitIvarList(const ObjCImplementationDecl *ID,
+                                   const char *Section,
                                    ArrayRef<llvm::Constant*> Ivars,
                                    bool ForClass);
 
@@ -1182,11 +1184,13 @@ namespace {
       /// EmitProtocolIDList - Generate the list of referenced
       /// protocols. The return value has type ProtocolListPtrTy.
       llvm::Constant *EmitProtocolList(Twine Name,
+                                       const char *Section,
                                          ObjCProtocolDecl::protocol_iterator begin,
                                          ObjCProtocolDecl::protocol_iterator end);
       /// EmitProtocolClassIDList - Generate the list of referenced
       /// protocol classes. The return value has type
       llvm::Constant *EmitProtocolClassIDList(Twine Name,
+                                         const char *Section,
                                          ObjCProtocolDecl::protocol_iterator begin,
                                          ObjCProtocolDecl::protocol_iterator end);
 
@@ -1650,7 +1654,14 @@ ObjCTypes(cgm) {
 
    NSConstantStringType = nullptr;
 
-   EmitImageInfo();
+   const char *Section;
+
+   if (CGM.getTriple().isOSBinFormatMachO())
+      Section = "__DATA,__objc_load_info,regular,no_dead_strip";
+   else 
+      Section = ".data.objc.objc_load_info";
+
+   EmitImageInfo( Section);
 }
 
 
@@ -2659,6 +2670,13 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::GlobalVariable   *GV;
    llvm::ConstantStruct   *NSStringHeader = CreateNSConstantStringStruct( Entry.first(), StringLength);
 
+   const char   *Section;
+
+   if (CGM.getTriple().isOSBinFormatMachO())
+      Section = "__DATA,__objc_load_info,regular,no_dead_strip";
+   else 
+      Section = ".data.objc.objc_load_info";
+      
    GV = new llvm::GlobalVariable( CGM.getModule(),
                                   NSStringHeader->getType(),
                                   false,
@@ -2667,7 +2685,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
                                   "__unnamed_nsstring"); // add underscore for header
                                                          // easier for the debugger
    // FIXME. Fix section.
-   GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
+   GV->setSection( Section);
    GV->setConstant( false);
 
    llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, 2);
@@ -4576,10 +4594,9 @@ llvm::Constant *
    Values[1] = llvm::ConstantArray::get(AT, Supers);
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
-
    llvm::GlobalVariable *GV = CreateMetadataVar( Name,
                                                  Init,
-                                                 "__DATA,__supers,regular,no_dead_strip",
+                                                 Section,
                                                  CGM.getPointerAlign());
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.SuperListPtrTy);
 }
@@ -4621,6 +4638,7 @@ void  CGObjCMulleRuntime::CollectProtocols( llvm::SmallPtrSet<llvm::Constant *, 
 
 llvm::Constant *
 CGObjCMulleRuntime::EmitProtocolList(Twine Name,
+                            const char *Section,
                             ObjCProtocolDecl::protocol_iterator begin,
                             ObjCProtocolDecl::protocol_iterator end)
 {
@@ -4651,7 +4669,7 @@ CGObjCMulleRuntime::EmitProtocolList(Twine Name,
 
    llvm::GlobalVariable *GV = CreateMetadataVar( Name,
                                                  Init,
-                                                 "__DATA,__protocols,regular,no_dead_strip",
+                                                 Section,
                                                  CGM.getPointerAlign());
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.ProtocolListPtrTy);
 }
@@ -4665,6 +4683,7 @@ CGObjCMulleRuntime::EmitProtocolList(Twine Name,
  */
 llvm::Constant *
 CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
+                                            const char *Section,
                                             ObjCProtocolDecl::protocol_iterator begin,
                                             ObjCProtocolDecl::protocol_iterator end)
 {
@@ -4702,7 +4721,7 @@ CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
    llvm::GlobalVariable *GV =
    CreateMetadataVar( Name,
                       Init,
-                      "__DATA,__protoclassids,regular,no_dead_strip",
+                      Section,
                       CGM.getPointerAlign());
    return llvm::ConstantExpr::getBitCast( GV, ObjCTypes.ClassIDPtrTy);
 }
@@ -4834,6 +4853,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 
 
 llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
+                                                  const char *Section,
                                                   const Decl *Container,
                                                   const ObjCContainerDecl *OCD,
                                                   const ObjCCommonTypesHelper &ObjCTypes) {
@@ -4875,7 +4895,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
 
    llvm::GlobalVariable *GV = CreateMetadataVar( Name,
                                                  Init,
-                                                 "__DATA,__property,regular,no_dead_strip",
+                                                 Section,
                                                  CGM.getPointerAlign());
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.PropertyListPtrTy);
 }
@@ -4933,6 +4953,13 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
                          uniqueid_comparator);
 
    llvm::Constant *Values[11];
+   
+   const char   *Section;
+
+   if (CGM.getTriple().isOSBinFormatMachO())
+      Section = "__DATA,__objc_load_info,regular,no_dead_strip";
+   else 
+      Section = ".data.objc.objc_load_info";
 
    // category name emitted below
 
@@ -4942,10 +4969,10 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    Values[ 4] = llvm::ConstantExpr::getBitCast( _HashConstantForString( Interface->getIvarHashString( CGM.getContext())), ObjCTypes.ClassIDTy);;
 
    Values[ 5] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
-                              "__DATA,__cat_cls_meth,regular,no_dead_strip",
+                              Section,
                               ClassMethods);
    Values[ 6] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
-                              "__DATA,__cat_inst_meth,regular,no_dead_strip",
+                              Section,
                               InstanceMethods);
 
    // If there is no category @interface then there can be no properties.
@@ -4955,12 +4982,15 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
       Values[ 1] = GetClassName(Category->getName());
 
       Values[ 7] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
+                                    Section,
                                    OCD, Category, ObjCTypes);
       Values[ 8] =
       EmitProtocolList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
+                       Section,
                        Category->protocol_begin(), Category->protocol_end());
       Values[ 9] =
       EmitProtocolClassIDList("OBJC_CATEGORY_PROTOCOLCLASSES_" + ExtName.str(),
+                               Section,
                                Category->protocol_begin(), Category->protocol_end());
    }
    else
@@ -4985,7 +5015,7 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    llvm::GlobalVariable *GV =
    CreateMetadataVar( "OBJC_CATEGORY_$_" + ExtName.str(),
                       Init,
-                      "__DATA,__category,regular,no_dead_strip",
+                      Section,
                       CGM.getPointerAlign(),
                       true,
                       true);
@@ -5012,12 +5042,22 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    // FIXME: Gross
    ObjCInterfaceDecl *Interface =
    const_cast<ObjCInterfaceDecl*>(ID->getClassInterface());
+
+   const char  *Section;
+
+   if (CGM.getTriple().isOSBinFormatMachO())
+      Section = "__DATA,__objc_load_info,regular,no_dead_strip";
+   else 
+      Section = ".data.objc.objc_load_info";
+
    llvm::Constant *Protocols =
    EmitProtocolList("OBJC_CLASS_PROTOCOLS_" + ID->getName(),
+                    Section,
                     Interface->all_referenced_protocol_begin(),
                     Interface->all_referenced_protocol_end());
    llvm::Constant *ProtocolClasses =
    EmitProtocolClassIDList("OBJC_CLASS_PROTOCOLCLASSES_" + ID->getName(),
+                     Section,
                       Interface->all_referenced_protocol_begin(),
                       Interface->all_referenced_protocol_end());
    unsigned Flags = FragileABI_Class_Factory;
@@ -5150,13 +5190,14 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
 
    Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, Size);
 
-   Values[ i++] = EmitIvarList( ID, InstanceVariables, false);
+   Values[ i++] = EmitIvarList( ID, Section, InstanceVariables, false);
 
    Values[ i++] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
-                                 "_DATA,__cls_meth,regular,no_dead_strip", ClassMethods);
+                                 Section, ClassMethods);
    Values[ i++] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
-                               "_DATA,__inst_meth,regular,no_dead_strip", InstanceMethods);
+                               Section, InstanceMethods);
    Values[ i++] = EmitPropertyList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
+                               Section,
                                ID, OID, ObjCTypes);
    Values[ i++] = Protocols;
    Values[ i++] = ProtocolClasses;
@@ -5174,7 +5215,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    Name += ClassName;
 
    // cargo cult programming
-   const char *Section = "__DATA,__class,regular,no_dead_strip";
+   // const char *Section = "__DATA,__class,regular,no_dead_strip";
    // Check for a forward reference.
    llvm::GlobalVariable *GV = CGM.getModule().getGlobalVariable(Name, true);
    if (GV) {
@@ -5235,6 +5276,7 @@ struct _mulle_objc_ivar_list
 };
 */
 llvm::Constant *CGObjCMulleRuntime::EmitIvarList(const ObjCImplementationDecl *ID,
+                                                 const char *Section,
                                                  ArrayRef<llvm::Constant*> Ivars,
                                         bool ForwardClass) {
    // When emitting the root class GCC emits ivar entries for the
@@ -5261,7 +5303,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitIvarList(const ObjCImplementationDecl *I
 
    GV = CreateMetadataVar( "OBJC_INSTANCE_VARIABLES_" + ID->getName(),
                            Init,
-                           "__DATA,__instance_vars,regular,no_dead_strip",
+                           Section,
                            CGM.getPointerAlign());
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.IvarListPtrTy);
 }
@@ -5457,9 +5499,13 @@ llvm::GlobalVariable *
 CGObjCCommonMulleRuntime::CreateCStringLiteral(StringRef Name,
                                                StringRef Label,
                                                bool NullTerminate) {
-   StringRef  Section;
+   const char   *Section;
 
-   Section = "__TEXT,__cstring,cstring_literals";
+   if (CGM.getTriple().isOSBinFormatMachO())
+      Section = "__TEXT,__cstring,cstring_literals";
+   else 
+      Section = ".rodata.c.cstring_literal";
+
    llvm::Constant *Value =
    llvm::ConstantDataArray::getString(VMContext, Name, NullTerminate);
    llvm::GlobalVariable *GV =
@@ -5695,6 +5741,13 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       LoadStrings.push_back( expr);
    }
 
+   const char  *Section;
+   
+   if (CGM.getTriple().isOSBinFormatMachO())
+      Section = "__DATA,__objc_load_info,regular,no_dead_strip";
+   else 
+      Section = ".data.objc.objc_load_info";
+
    //if( CGM.getCodeGenOpts().getDebugInfo() >= clang::codegenoptions::LimitedDebugInfo)
    {
       for (llvm::StringMap<llvm::ConstantInt *>::const_iterator
@@ -5706,7 +5759,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
          String  = CreateMetadataVar( "OBJC_HASHNAME_" + I->getKey(),
                                       llvm::ConstantDataArray::getString( VMContext, I->getKey()),
-                                      "__DATA,__module_info,regular,no_dead_strip",
+                                      Section,
                                       CGM.getPointerAlign());
          Values[0] = llvm::ConstantExpr::getBitCast( I->getValue(), ObjCTypes.ClassIDTy);
          Values[1] = llvm::ConstantExpr::getBitCast( String, CGM.VoidPtrTy);
@@ -5769,13 +5822,13 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       return( nullptr);
    }
 
-  llvm::Constant *Universe     = EmitUniverse( "OBJC_UNIVERSE_LOAD", "__DATA,_objc_load_info");
-  llvm::Constant *ClassList    = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
-  llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
-  llvm::Constant *SuperList    = EmitSuperList( "OBJC_SUPER_LOADS", "__DATA,_objc_load_info", LoadSupers);
-  llvm::Constant *StringList   = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", LoadStrings);
-  llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", "__DATA,_objc_load_info", EmitHashes);
-  llvm::Constant *LoadInfo     = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", Universe, ClassList, CategoryList, SuperList, StringList, HashNameList);
+  llvm::Constant *Universe     = EmitUniverse( "OBJC_UNIVERSE_LOAD", Section);
+  llvm::Constant *ClassList    = EmitClassList( "OBJC_CLASS_LOADS", Section, LoadClasses);
+  llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", Section, LoadCategories);
+  llvm::Constant *SuperList    = EmitSuperList( "OBJC_SUPER_LOADS", Section, LoadSupers);
+  llvm::Constant *StringList   = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", Section, LoadStrings);
+  llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", Section, EmitHashes);
+  llvm::Constant *LoadInfo     = EmitLoadInfoList( "OBJC_LOAD_INFO", Section, Universe, ClassList, CategoryList, SuperList, StringList, HashNameList);
 
    // take collected initializers and create a __attribute__(constructor)
    // static void   __load_mulle_objc() function
@@ -6723,9 +6776,8 @@ enum ImageInfoFlags {
    eImageInfo_ImageIsSimulated    = (1 << 5)
 };
 
-void CGObjCCommonMulleRuntime::EmitImageInfo() {
-   const char *Section = "__DATA, __image_info,regular,no_dead_strip"; // , no_dead_strip ?
-
+void CGObjCCommonMulleRuntime::EmitImageInfo( const char *Section) 
+{
    // Generate module-level named metadata to convey this information to the
    // linker and code-gen.
    llvm::Module &Mod = CGM.getModule();

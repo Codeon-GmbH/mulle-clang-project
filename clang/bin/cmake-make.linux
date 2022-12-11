@@ -9,12 +9,17 @@
 # MEMO: If you can't use ninja copy this file and make it cmake-make or so.
 PREFIX="${PREFIX:-/opt}"
 # VERSION / RC are passed in via mulle-clang-cpack
-INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-14.0.6.1}${RC}"
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-14.0.6.2}${RC}"
+
+# See: https://github.com/msys2/MINGW-packages/issues/13667
 
 [ ! -d build ] && mkdir build
 cd build &&
 cmake \
-   -DLLVM_ENABLE_PROJECTS="libcxxabi;libcxx;compiler-rt;clang" \
+   -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx;libunwind"  \
+   -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+   -DCOMPILER_RT_USE_BUILTINS_LIBRARY:BOOL=ON \
+   -DCLANG_DEFAULT_UNWINDLIB="libunwind" \
    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
    -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
    -DCLANG_VENDOR='mulle' \

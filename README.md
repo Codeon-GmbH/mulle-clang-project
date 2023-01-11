@@ -17,6 +17,10 @@ It is not recommended to use it for C++, since that is not tested.
 It is not recommended to use it for other Objective-C runtimes, since there
 have been some changes, that affect other runtimes.
 
+> #### Bugtracker
+>
+> Use [mulle-objc-cc](https://github.com/mulle-cc/mulle-objc-cc/issues) for bug
+> reports or other issues.
 
 ## Operation
 

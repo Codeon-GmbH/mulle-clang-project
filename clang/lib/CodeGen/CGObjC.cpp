@@ -19,6 +19,9 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
+// @mulle-objc@ required header >
+#include "clang/AST/ExprObjC.h"
+// @mulle-objc@ required header <
 #include "clang/AST/StmtObjC.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
@@ -111,12 +114,34 @@ CodeGenFunction::EmitObjCBoxedExpr(const ObjCBoxedExpr *E) {
 
     Args.add(RValue::get(Cast), EncodingQT);
   } else {
+    // @mulle-objc@ >> MetaABI: ugly hack for literals >
+    // if( ! getContext().typeNeedsMetaABIAlloca( ArgQT))
+    //     ArgQT =getContext().VoidPtrTy;
+    // @mulle-objc@ >> MetaABI: ugly hack for literals <
+
     Args.add(EmitAnyExpr(SubExpr), ArgQT);
   }
+
+  // @mulle-objc@ >> MetaABI: boxed args code Part 1 >
+  CGObjCRuntimeLifetimeMarker   Marker;
+
+  Marker = Runtime.ConvertToMetaABIArgsIfNeeded( *this, BoxingMethod, Args);
+
+  // @mulle-objc@ << MetaABI: boxed args code Part 1 <
 
   RValue result = Runtime.GenerateMessageSend(
       *this, ReturnValueSlot(), BoxingMethod->getReturnType(), Sel, Receiver,
       Args, ClassDecl, BoxingMethod);
+
+  //
+  // @mulle-objc@ MetaABI: tell optimizer the alloca lifetime is done >
+  //
+  if( Marker.SizeV)  // leaks probably, coz alloced
+      EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
+  //
+  // @mulle-objc@ MetaABI: tell optimizer the alloca lifetime is done <
+  //
+
   return Builder.CreateBitCast(result.getScalarVal(),
                                ConvertType(E->getType()));
 }
@@ -205,11 +230,20 @@ llvm::Value *CodeGenFunction::EmitObjCCollectionLiteral(const Expr *E,
   ObjCMethodDecl::param_const_iterator PI = MethodWithObjects->param_begin();
   const ParmVarDecl *argDecl = *PI++;
   QualType ArgQT = argDecl->getType().getUnqualifiedType();
-  Args.add(RValue::get(Objects.getPointer()), ArgQT);
+  // @mulle-objc@ >> MetaABI: literal args code, fix original code 1 >
+  // Args.add(RValue::get(Objects.getPointer()), ArgQT);
+
+  Address firstObject = Builder.CreateConstArrayGEP(Objects, 0);
+  Args.add(RValue::get(firstObject.getPointer()), ArgQT);
+  // @mulle-objc@ >> MetaABI: literal args code, fix original code 1 <
   if (DLE) {
     argDecl = *PI++;
     ArgQT = argDecl->getType().getUnqualifiedType();
-    Args.add(RValue::get(Keys.getPointer()), ArgQT);
+    // @mulle-objc@ >> MetaABI: literal args code, fix original code 2 >
+    // Args.add(RValue::get(Keys.getPointer()), ArgQT);
+    Address firstKey = Builder.CreateConstArrayGEP(Keys, 0);
+    Args.add(RValue::get(firstKey.getPointer()), ArgQT);
+  // @mulle-objc@ >> MetaABI: literal args code, fix original code 2 <
   }
   argDecl = *PI;
   ArgQT = argDecl->getType().getUnqualifiedType();
@@ -227,6 +261,13 @@ llvm::Value *CodeGenFunction::EmitObjCCollectionLiteral(const Expr *E,
   CGObjCRuntime &Runtime = CGM.getObjCRuntime();
   llvm::Value *Receiver = Runtime.GetClass(*this, Class);
 
+  // @mulle-objc@ >> MetaABI: literal args code Part 1
+  CGObjCRuntimeLifetimeMarker   Marker;
+
+  Marker = Runtime.ConvertToMetaABIArgsIfNeeded( *this, MethodWithObjects, Args);
+
+  // @mulle-objc@ << MetaABI: literal args code
+
   // Generate the message send.
   RValue result = Runtime.GenerateMessageSend(
       *this, ReturnValueSlot(), MethodWithObjects->getReturnType(), Sel,
@@ -239,6 +280,12 @@ llvm::Value *CodeGenFunction::EmitObjCCollectionLiteral(const Expr *E,
   if (TrackNeededObjects) {
     EmitARCIntrinsicUse(NeededObjects);
   }
+
+  // @mulle-objc@ MetaABI: tell optimizer the alloca lifetime is done >
+  //
+   if( Marker.SizeV)  // leaks probably, coz alloced
+      EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
+  // @mulle-objc@ MetaABI: tell optimizer the alloca lifetime is done <
 
   return Builder.CreateBitCast(result.getScalarVal(),
                                ConvertType(E->getType()));
@@ -628,7 +675,35 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
     ReceiverType = E->getClassReceiver();
     OID = ReceiverType->castAs<ObjCObjectType>()->getInterface();
     assert(OID && "Invalid Objective-C class message send");
-    Receiver = Runtime.GetClass(*this, OID);
+
+    //
+    // @mulle-objc@ faster class lookup if in a method  >
+    //
+    const ObjCMethodDecl   *methodDecl;
+
+    methodDecl = NULL;
+    if( getLangOpts().ObjCClasscallUseSelf)
+    {
+        methodDecl = dyn_cast<ObjCMethodDecl>(CurFuncDecl);
+        //
+        // only use OMF_None methods by default, unless -fobjc-classcall-init-use-self
+        // has been given
+        //
+        if( methodDecl && (methodDecl->getMethodFamily() != OMF_None &&
+                           getLangOpts().ObjCClasscallUseSelf <= 1))
+           methodDecl = NULL;
+    }
+
+    if( methodDecl) // CurFuncDecl && dyn_cast<ObjCMethodDecl>(CurFuncDecl)->getSelfDecl())
+    {
+      llvm::Value *Self;
+
+      Self = LoadObjCSelf();
+      Receiver = Runtime.GetClass(*this, OID, Self);
+    }
+    else
+       Receiver = Runtime.GetClass(*this, OID);
+    // @mulle-objc@ faster class lookup if in a method <
     isClassMessage = true;
     break;
   }
@@ -661,7 +736,17 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   QualType ResultType = method ? method->getReturnType() : E->getType();
 
   CallArgList Args;
-  EmitCallArgs(Args, method, E->arguments(), /*AC*/AbstractCallee(method));
+
+  // @mulle-objc@ MetaABI: added a patchpoint in EmitObjCMessageExpr >
+  // EmitCallArgs(Args, method, E->arguments(), /*AC*/AbstractCallee(method));
+
+  // for GenerateCallArgs. take arguments, push it into one big struct
+  // Emit this argument. EmitCallArgs is substituted by tis,
+  //
+  CGObjCRuntimeLifetimeMarker   Marker;
+
+  Marker = Runtime.GenerateCallArgs( *this, Args, method, E);
+  // @mulle-objc@ MetaABI: added a patchpoint in EmitObjCMessageExpr <
 
   // For delegate init calls in ARC, do an unsafe store of null into
   // self.  This represents the call taking direct ownership of that
@@ -714,6 +799,13 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
 
     Builder.CreateStore(newSelf, selfAddr);
   }
+
+  // @mulle-objc@ MetaABI: tell optimizer the lifetime is done for this alloca >
+  // non-mulle runtimes will NULL here
+  //
+  if( Marker.SizeV)  // leaks probably, coz alloced
+     EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
+  // @mulle-objc@ MetaABI: tell optimizer the lifetime is done for this alloca <
 
   return AdjustObjCObjectType(*this, E->getType(), result);
 }
@@ -772,13 +864,28 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   if (!OMD->isDirectMethod())
     args.push_back(OMD->getCmdDecl());
 
-  args.append(OMD->param_begin(), OMD->param_end());
+  // @mulle-objc@ MetaABI: Push ParamDecl on args Decl, the _param pointer >
+  // Ignore others
+
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && OMD->getParamDecl())
+  {
+     args.push_back( OMD->getParamDecl());
+  }
+  else
+  {
+     args.append(OMD->param_begin(), OMD->param_end());
+  }
+  // @mulle-objc@ MetaABI: Push ParamDecl on args Decl, the _param pointer <
 
   CurGD = OMD;
   CurEHLocation = OMD->getEndLoc();
 
-  StartFunction(OMD, OMD->getReturnType(), Fn, FI, args,
+  // @mulle-objc@ MetaABI: Use Function FI.getReturnType() because it's void * >
+
+  StartFunction(OMD, FI.getReturnType(), Fn, FI, args,
                 OMD->getLocation(), StartLoc);
+
+  // @mulle-objc@ MetaABI: Use Function FI.getReturnType() because it's void * <
 
   if (OMD->isDirectMethod()) {
     // This function is a direct call, it has to implement a nil check
@@ -798,6 +905,293 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
       EHStack.pushCleanup<FinishARCDealloc>(getARCCleanupKind());
   }
 }
+
+
+llvm::Value   *CodeGenFunction::GetMetaABIParamAddressLValue( const Decl *FuncDecl)
+{
+ const ObjCMethodDecl     *MD;
+   RecordDecl             *RD;
+   QualType               recordTy;
+   QualType               recordPtrTy;
+   llvm::Type             *llvmRecType;
+   llvm::Type             *llvmPointerType;
+   llvm::Value            *paramAddr;
+   //unsigned               alignment ;
+
+   MD = dyn_cast<ObjCMethodDecl>( FuncDecl);
+         // return value: wrap scalar in aggregate, return pointer if in method
+   if( ! MD)
+      return( NULL);
+
+   RD = MD->getRvalRecord();
+   if( ! RD)
+   {
+      return( NULL);
+   }
+
+   recordTy    = CGM.getContext().getTagDeclType( RD);
+   recordPtrTy = CGM.getContext().getPointerType( recordTy);
+   llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
+   llvmPointerType = llvmRecType->getPointerTo();
+
+   auto it = LocalDeclMap.find( MD->getParamDecl());
+   CodeGen::Address  param = it->getSecond();
+
+   // store ScalarExpr in alloca
+   // alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
+   paramAddr = Builder.CreateBitCast( Builder.CreateLoad( param, "_param.rval"),
+                                      llvmPointerType);
+   return( paramAddr);
+}
+
+// @mulle-objc@ MetaABI: > put rval into _param if needed
+void   CodeGenFunction::EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl, llvm::Value *exprResult, QualType exprType)
+{
+   const ObjCMethodDecl   *MD;
+   RecordDecl             *RD;
+   QualType               recordTy;
+//   QualType               recordPtrTy;
+//   llvm::Type             *llvmRecType;
+//   llvm::Type             *llvmPointerType;
+   llvm::Value            *paramAddr;
+   //unsigned               alignment ;
+   QualType               longType;
+
+   MD = dyn_cast<ObjCMethodDecl>( FuncDecl);
+         // return value: wrap scalar in aggregate, return pointer if in method
+   if( ! MD)
+   {
+      Builder.CreateStore( exprResult, ReturnValue);
+      return;
+   }
+
+   RD = MD->getRvalRecord();
+   if( ! RD)
+   {
+      if( exprType->isIntegralOrEnumerationType())
+      {
+         longType   = CGM.getContext().LongTy;
+         exprResult = Builder.CreateSExtOrBitCast( exprResult, getTypes().ConvertTypeForMem( longType));
+      }
+      exprResult = Builder.CreateBitOrPointerCast( exprResult, getTypes().ConvertTypeForMem( getContext().VoidPtrTy));
+      Builder.CreateStore( exprResult, ReturnValue);
+      return;
+   }
+
+   recordTy = CGM.getContext().getTagDeclType( RD);
+
+   // store ScalarExpr in alloca
+   // alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
+   paramAddr = GetMetaABIParamAddressLValue( FuncDecl);
+
+   LValue Record = MakeNaturalAlignAddrLValue( paramAddr, recordTy);
+   LValue Field = EmitLValueForField( Record, *RD->field_begin());
+   EmitStoreOfScalar(exprResult, Field);
+
+   // store pointer in returnValue
+   // This could be self as well, if it was known that it is self, it would
+   // be more useful...
+   llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+   Builder.CreateStore( newParam, ReturnValue);
+}
+
+
+void   CodeGenFunction::EmitMetaABIWriteAggregateReturnValue( const Decl *FuncDecl,
+                                                              Address ExprResult,
+                                                              Address Param,
+                                                              QualType ExprType)
+{
+   // surprisingly easy, too easy ?
+
+   EmitAggregateCopy( MakeAddrLValue( Param, ExprType),
+                      MakeAddrLValue( ExprResult, ExprType),
+                      ExprType,
+                      getOverlapForReturnValue()); // copy/paste. Is this correct ?
+
+   llvm::Value   *paramAddr;
+   // CharUnits     alignment;
+
+  // store pointer in returnValue , needed for nil detection
+  // alignment = CGM.getContext().getTypeAlignInChars( CGM.getContext().VoidPtrTy);
+   paramAddr = GetMetaABIParamAddressLValue( FuncDecl);
+
+   llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+   Builder.CreateStore( newParam, ReturnValue);
+}
+
+
+void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const Expr *RV)
+{
+   const ObjCMethodDecl   *MD;
+   RecordDecl             *RD;
+   QualType               recordTy;
+   QualType               recordPtrTy;
+   llvm::Value            *paramAddr;
+   CharUnits              alignment;
+
+   switch( getEvaluationKind( RV->getType()))
+   {
+      case TEK_Scalar:
+      {
+         llvm::Value *exprResult = EmitScalarExpr( RV);
+
+         EmitMetaABIWriteScalarReturnValue( FuncDecl, exprResult, RV->getType());
+         return;
+      }
+
+      case TEK_Aggregate:
+      {
+         RD = nullptr;
+         MD = dyn_cast<ObjCMethodDecl>( FuncDecl);
+         if( MD)
+            RD = MD->getRvalRecord();
+
+         // return value: emit aggregate, return pointer to it
+         if( ! RD)
+         {
+
+            EmitAggExpr(RV, AggValueSlot::forAddr(ReturnValue,
+                                                  Qualifiers(),
+                                                  AggValueSlot::IsDestructed,
+                                                  AggValueSlot::DoesNotNeedGCBarriers,
+                                                  AggValueSlot::IsNotAliased,
+                                                  AggValueSlot::DoesNotOverlap));
+            return;
+         }
+
+         recordTy    = CGM.getContext().getTagDeclType( RD);
+         recordPtrTy = CGM.getContext().getPointerType( recordTy);
+
+         // get _param address (known to be big enough)
+         auto it = LocalDeclMap.find( MD->getParamDecl());
+         CodeGen::Address param = it->getSecond();
+
+         // emit aggregate expression
+         // cast paramAddr to return value...
+         auto RVType = RV->getType();
+         alignment = CGM.getContext().getTypeAlignInChars( RVType);
+         auto llvmType = getTypes().ConvertTypeForMem( RVType); //->getPointerTo();
+         auto llvmPtrType = llvmType->getPointerTo();
+         paramAddr = Builder.CreateBitCast( Builder.CreateLoad( param, "_param.rval"), llvmPtrType);
+
+         EmitAggExpr(RV, AggValueSlot::forAddr( CodeGen::Address( paramAddr, llvmType, alignment),
+                                                Qualifiers(),
+                                                AggValueSlot::IsDestructed,
+                                                AggValueSlot::DoesNotNeedGCBarriers,
+                                                AggValueSlot::IsNotAliased,
+                                                AggValueSlot::DoesNotOverlap));
+
+         // store pointer in returnValue , needed for nil detection
+         llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+         Builder.CreateStore( newParam, ReturnValue);
+         return;
+      }
+
+      default :
+         llvm_unreachable( "MulleObjC can only deal with scalars and structs");
+   }
+}
+
+
+CodeGen::RValue   CodeGenFunction::EmitMetaABIReadReturnValue( const ObjCMethodDecl *Method,
+                                                               CodeGen::RValue Rvalue,
+                                                               CodeGen::RValue Param,
+                                                               ReturnValueSlot Return,
+                                                               QualType ResultType)
+{
+   llvm::Value *V;
+
+   // now cast this to actual return value
+   // figure out, what we get back
+   RecordDecl  *RV = nullptr;
+
+   if( Method)
+      RV = Method->getRvalRecord();
+
+   // if method returns a pointer to result alloca, than there is a RV
+   if( RV)
+   {
+      CharUnits Alignment = CGM.getContext().getTypeAlignInChars( ResultType);
+
+      //
+      // ignore the return value, and "know" that we are using arg[2] as return
+      // storage. This should have the advantage, that the alloca up there can
+      // be optimized away by the compiler.
+      //
+      V = Param.getScalarVal();
+
+      // use return value slot, which is an allocaed aggregate of proper type
+      Address   Dst = Return.getValue();
+
+      llvm::AllocaInst  *alloca;
+      llvm::CallInst    *stackpointer;
+
+      alloca       = NULL;
+      stackpointer = NULL;
+
+      llvm::Type *llvmType = getTypes().ConvertTypeForMem( ResultType);
+
+      // is this ever used ? YES unfortunately
+      if( ! Dst.isValid())
+      {
+         // Save the stack.
+         llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::stacksave);
+         stackpointer      = Builder.CreateCall(F, {}, "inalloca.save");
+
+         // alloca some memory
+         alloca = Builder.CreateAlloca( llvmType);
+         Dst = Address( alloca, llvmType, Alignment);
+      }
+
+      //
+      // memcpy stuff from _param
+      //
+      llvm::BasicBlock *copyBlock = createBasicBlock("msgSend.metaABIcopy");
+      llvm::BasicBlock *zeroBlock = createBasicBlock("msgSend.metaABIzero");
+      llvm::BasicBlock *doneBlock = createBasicBlock("msgSend.metaABIdone");
+      llvm::Value      *isNull    = Builder.CreateIsNull( Rvalue.getScalarVal());
+      Builder.CreateCondBr( isNull, zeroBlock, copyBlock);
+      EmitBlock(zeroBlock);
+      {
+         EmitNullInitialization( Dst, ResultType);
+         Builder.CreateBr(doneBlock);
+      }
+      EmitBlock(copyBlock);
+      {
+         LValue SrcLV = MakeAddrLValue( Address( V, llvmType, Alignment), ResultType);
+         LValue DstLV = MakeAddrLValue( Dst, ResultType);
+         EmitAggregateCopy( DstLV, SrcLV, ResultType, getOverlapForReturnValue());  // copy/paste
+      }
+      EmitBlock(doneBlock);
+
+      if( ResultType->isStructureOrClassType())
+         Rvalue = RValue::getAggregate( Dst); // I hope this works fine...
+      else
+      {
+         V = Builder.CreateLoad( Dst);
+         Rvalue = RValue::get(V);
+      }
+
+      if( stackpointer)
+      {
+         llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::stackrestore);
+         Builder.CreateCall(F, stackpointer);
+      }
+   }
+   else
+   {
+      V = Rvalue.getScalarVal();
+      if( V && V->getType() != getTypes().ConvertTypeForMem( ResultType))
+      {
+         V = Builder.CreateBitOrPointerCast(V, getTypes().ConvertTypeForMem( ResultType));
+         Rvalue = RValue::get(V);
+      }
+   }
+
+   return( Rvalue);
+}
+// @mulle-objc@ MetaABI: < put rval into _param if needed
+
 
 static llvm::Value *emitARCRetainLoadOfScalar(CodeGenFunction &CGF,
                                               LValue lvalue, QualType type);
@@ -1130,6 +1524,41 @@ static llvm::Value *emitCmdValueForGetterSetterBody(CodeGenFunction &CGF,
 
   return CGF.Builder.CreateLoad(CGF.GetAddrOfLocalVar(MD->getCmdDecl()), "cmd");
 }
+// @mulle-objc@ new property attribute relationship >>>
+
+//
+// this should output a _foo = willReadRelationship( self, _foo) statement
+// only works if _foo is void pointer compatible (which we should check)
+//
+static void  emitWillReadRelationship( CodeGenFunction &CGF,
+                                       const ObjCImplementationDecl *classImpl,
+                                       const ObjCPropertyImplDecl *propImpl)
+{
+    llvm::FunctionCallee getWillReadRelationshipFn =
+        CGF.CGM.getObjCRuntime().GetWillReadRelationshipFunction();
+    if (!getWillReadRelationshipFn) {
+      CGF.CGM.ErrorUnsupported(propImpl, "Obj-C relationship requires willReadRelationship function");
+      return;
+    }
+
+    // this sets up the function call, by loading "self" and reading "ivar"
+    CGCallee callee = CGCallee::forDirect(getWillReadRelationshipFn);
+
+    llvm::Value  *self       = CGF.Builder.CreateBitCast( CGF.LoadObjCSelf(), CGF.VoidPtrTy);
+    ObjCIvarDecl *ivar       = propImpl->getPropertyIvarDecl();
+    llvm::Value  *ivarOffset = CGF.EmitIvarOffset(classImpl->getClassInterface(), ivar);
+
+    CallArgList args;
+
+    args.add(RValue::get(self), CGF.getContext().getObjCIdType());
+    args.add(RValue::get(ivarOffset), CGF.getContext().getPointerDiffType());
+
+    llvm::CallBase *CallInstruction;
+    CGF.EmitCall( CGF.getTypes().arrangeBuiltinFunctionCall(
+                              CGF.getContext().VoidTy, args),
+                         callee, ReturnValueSlot(), args, &CallInstruction);
+}
+// @mulle-objc@ new property attribute relationship <<<
 
 void
 CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
@@ -1152,6 +1581,10 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
     }
     return;
   }
+  // @mulle-objc@ new property attribute relationship >
+  if( propImpl->getPropertyDecl()->isRelationship())
+    emitWillReadRelationship( *this, classImpl, propImpl);
+  // @mulle-objc@ new property attribute relationship <
 
   // If there's a non-trivial 'get' expression, we just have to emit that.
   if (!hasTrivialGetExpr(propImpl)) {
@@ -1251,6 +1684,13 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
         RV.getScalarVal(),
         getTypes().ConvertType(getterMethod->getReturnType())));
 
+    // @mulle-objc@ MetaABI: need proper casting for property return value >
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      EmitMetaABIWriteScalarReturnValue( getterMethod, RV.getScalarVal(), propType);
+      return;
+    }
+    // @mulle-objc@ MetaABI: need proper casting for property return value <
     EmitReturnOfRValue(RV, propType);
 
     // objc_getProperty does an autorelease, so we should suppress ours.
@@ -1280,6 +1720,22 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
       // The return value slot is guaranteed to not be aliased, but
       // that's not necessarily the same as "on the stack", so
       // we still potentially need objc_memmove_collectable.
+
+      // @mulle-objc@ metaABI return value >
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         auto it = LocalDeclMap.find( getterMethod->getParamDecl());
+         CodeGen::Address  param = it->getSecond();
+         llvm::LoadInst   *inst;
+
+         inst = Builder.CreateLoad( param, "param");
+         Address thisAdr = LV.getAddress(*this);
+         Address instAdr = Address( inst, inst->getType(), CGM.getPointerAlign());
+         EmitMetaABIWriteAggregateReturnValue( getterMethod, thisAdr, instAdr, ivarType);
+         return;
+      }
+      // @mulle-objc@ metaABI return value <
+
       EmitAggregateCopy(/* Dest= */ MakeAddrLValue(ReturnValue, ivarType),
                         /* Src= */ LV, ivarType, getOverlapForReturnValue());
       return;
@@ -1308,6 +1764,13 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
             value, ConvertType(GetterMethodDecl->getReturnType()));
       }
 
+      // @mulle-objc@ MetaABI: need proper casting for property return value >
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         EmitMetaABIWriteScalarReturnValue( getterMethod, value, ivarType);
+         return;
+      }
+      // @mulle-objc@ MetaABI: need proper casting for property return value <
       EmitReturnOfRValue(RValue::get(value), propType);
       return;
     }
@@ -1318,6 +1781,31 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
   }
   llvm_unreachable("bad @property implementation strategy!");
 }
+
+// @mulle-objc@ -willChange support >
+static void  emitWillChange( CodeGenFunction &CGF, const ObjCPropertyImplDecl *propImpl)
+{
+    llvm::FunctionCallee getWillChangeFn =
+        CGF.CGM.getObjCRuntime().GetWillChangeFunction();
+    if (!getWillChangeFn) {
+      CGF.CGM.ErrorUnsupported(propImpl, "Obj-C observable requires willChange function");
+      return;
+    }
+
+    CGCallee callee = CGCallee::forDirect(getWillChangeFn);
+
+    llvm::Value *self = CGF.Builder.CreateBitCast( CGF.LoadObjCSelf(), CGF.VoidPtrTy);
+
+    CallArgList args;
+
+    args.add(RValue::get(self), CGF.getContext().getObjCIdType());
+
+    llvm::CallBase *CallInstruction;
+    CGF.EmitCall( CGF.getTypes().arrangeBuiltinFunctionCall(
+                              CGF.getContext().VoidTy, args),
+                         callee, ReturnValueSlot(), args, &CallInstruction);
+}
+// @mulle-objc@ -willChange support <
 
 /// emitStructSetterCall - Call the runtime function to store the value
 /// from the first formal parameter into the given ivar.
@@ -1431,6 +1919,48 @@ static bool UseOptimizedSetter(CodeGenModule &CGM) {
   return CGM.getLangOpts().ObjCRuntime.hasOptimizedSetter();
 }
 
+// @mulle-objc@ new function CodeGenFunction::emitObjCSetterBodyStatement >
+void CodeGenFunction::emitObjCSetterBodyStatement( ObjCIvarRefExpr &ivarRef, QualType argType, Expr *expr)
+{
+   ImplicitCastExpr argLoad(ImplicitCastExpr::OnStack,
+                            argType.getUnqualifiedType(), CK_LValueToRValue,
+                            expr, VK_PRValue, FPOptionsOverride());
+
+   // The property type can differ from the ivar type in some situations with
+   // Objective-C pointer types, we can always bit cast the RHS in these cases.
+   // The following absurdity is just to ensure well-formed IR.
+   CastKind argCK = CK_NoOp;
+   if (ivarRef.getType()->isObjCObjectPointerType()) {
+      if (argLoad.getType()->isObjCObjectPointerType())
+         argCK = CK_BitCast;
+      else if (argLoad.getType()->isBlockPointerType())
+         argCK = CK_BlockPointerToObjCPointerCast;
+      else
+         argCK = CK_CPointerToObjCPointerCast;
+   } else if (ivarRef.getType()->isBlockPointerType()) {
+      if (argLoad.getType()->isBlockPointerType())
+         argCK = CK_BitCast;
+      else
+         argCK = CK_AnyPointerToBlockPointerCast;
+   } else if (ivarRef.getType()->isPointerType()) {
+      argCK = CK_BitCast;
+   }
+   ImplicitCastExpr argCast(ImplicitCastExpr::OnStack,
+                            ivarRef.getType(), argCK, &argLoad,
+                            VK_PRValue,FPOptionsOverride());
+   Expr *finalArg = &argLoad;
+   if (!getContext().hasSameUnqualifiedType(ivarRef.getType(),
+                                            argLoad.getType()))
+      finalArg = &argCast;
+
+  BinaryOperator *assign = BinaryOperator::Create(
+      getContext(), &ivarRef, finalArg, BO_Assign, ivarRef.getType(), VK_PRValue,
+      OK_Ordinary, SourceLocation(), FPOptionsOverride());
+
+   EmitStmt(assign);
+}
+// @mulle-objc@ new function CodeGenFunction::emitObjCSetterBodyStatement <
+
 void
 CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
                                         const ObjCPropertyImplDecl *propImpl,
@@ -1455,6 +1985,11 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
     DeactivateCleanupBlock(CalleeDestructedParamCleanups[PVD], AllocaInsertPt);
     return;
   }
+  // @mulle-objc@ new property attribute observable >
+  const ObjCPropertyDecl *prop = propImpl->getPropertyDecl();
+  if( prop->isObservable())
+    emitWillChange( *this, propImpl);
+  // @mulle-objc@ new property attribute observable <
 
   // Just use the setter expression if Sema gave us one and it's
   // non-trivial.
@@ -1578,8 +2113,32 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
                           SourceLocation(), SourceLocation(),
                           &selfLoad, true, true);
 
+  //
+  // @mulle-objc@ MetaABI: property setter accesses paramDecl >
+  //
+  // this code really should be runtime specific
+  //
   ParmVarDecl *argDecl = *setterMethod->param_begin();
   QualType argType = argDecl->getType().getNonReferenceType();
+
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && setterMethod->getParamDecl())
+  {
+      ValueDecl *paramDecl = setterMethod->getParamDecl();
+      DeclRefExpr param( getContext(), paramDecl, false, paramDecl->getType(),
+                        VK_LValue, SourceLocation());
+      FieldDecl *FD = setterMethod->FindParamRecordField( argDecl->getIdentifier());
+      argType = FD->getType().getNonReferenceType();
+      DeclarationNameInfo   memberNameInfo( FD->getDeclName(), SourceLocation());
+
+      MemberExpr   *memberExpr = MemberExpr::CreateImplicit( getContext(), &param, true,
+                              FD, argType,
+                              VK_LValue, OK_Ordinary);
+      // need this duplicate function, because otherwise memberExpr vanishes
+      emitObjCSetterBodyStatement( ivarRef, argType, memberExpr);
+      return;
+  }
+  // @mulle-objc@ MetaABI: property setter accesses paramDecl <
+
   DeclRefExpr arg(getContext(), argDecl, false, argType, VK_LValue,
                   SourceLocation());
   ImplicitCastExpr argLoad(ImplicitCastExpr::OnStack,
@@ -1640,6 +2199,110 @@ void CodeGenFunction::GenerateObjCSetter(ObjCImplementationDecl *IMP,
 
   FinishFunction(OMD->getEndLoc());
 }
+
+// @mulle-objc@ new property attribute container >>>
+void
+CodeGenFunction::generateObjCContainerMethodBody(const ObjCImplementationDecl *classImpl,
+                                        const ObjCPropertyImplDecl *propImpl,
+                                        ObjCMethodDecl *method,
+                                        llvm::FunctionCallee propertyFn) {
+  ObjCIvarDecl *ivar = propImpl->getPropertyIvarDecl();
+  const ObjCPropertyDecl *prop = propImpl->getPropertyDecl();
+
+  // @mulle-objc@ new property attributes observable, relationship >
+  if( prop->isObservable())
+    emitWillChange( *this, propImpl);
+  if( prop->isRelationship())
+    emitWillReadRelationship( *this, classImpl, propImpl);
+  // @mulle-objc@ new property attributes observable, relationship <
+
+  //
+  // Emit either:
+  // void   mulle_eo_object_add_to_container( id self, ptrdiff_t offset, id value)
+  // void   mulle_eo_object_remove_from_container( id self, ptrdiff_t offset, id value)
+  //
+  llvm::Value *self =
+    Builder.CreateBitCast(LoadObjCSelf(), VoidPtrTy);
+  llvm::Value *ivarOffset =
+    EmitIvarOffset(classImpl->getClassInterface(), ivar);
+  Address argAddr = GetAddrOfLocalVar(*method->param_begin());
+  llvm::Value *arg = Builder.CreateLoad(argAddr, "arg");
+  arg = Builder.CreateBitCast(arg, VoidPtrTy);
+  CallArgList args;
+  args.add(RValue::get(self), getContext().getObjCIdType());
+  args.add(RValue::get(ivarOffset), getContext().getPointerDiffType());
+  args.add(RValue::get(arg), getContext().getObjCIdType());
+    // FIXME: We shouldn't need to get the function info here, the runtime
+    // already should have computed it to build the function.
+  CGCallee callee = CGCallee::forDirect( propertyFn);
+  EmitCall(getTypes().arrangeBuiltinFunctionCall(getContext().VoidTy, args),
+            callee, ReturnValueSlot(), args);
+}
+
+
+void
+CodeGenFunction::generateObjCAdderBody(const ObjCImplementationDecl *classImpl,
+                                        const ObjCPropertyImplDecl *propImpl,
+                                        ObjCMethodDecl *method) {
+  llvm::FunctionCallee propertyFn;
+  propertyFn = CGM.getObjCRuntime().GetPropertyContainerAddFunction();
+  if (!propertyFn) {
+    CGM.ErrorUnsupported(propImpl, "Obj-C container adder required"); // ????
+    return;
+  }
+  generateObjCContainerMethodBody( classImpl, propImpl, method, propertyFn);
+}
+
+
+void
+CodeGenFunction::generateObjCRemoverBody(const ObjCImplementationDecl *classImpl,
+                                        const ObjCPropertyImplDecl *propImpl,
+                                        ObjCMethodDecl *method) {
+  llvm::FunctionCallee propertyFn;
+  propertyFn = CGM.getObjCRuntime().GetPropertyContainerRemoveFunction();
+  if (!propertyFn) {
+    CGM.ErrorUnsupported(propImpl, "Obj-C container remover required"); // ????
+    return;
+  }
+  generateObjCContainerMethodBody( classImpl, propImpl, method, propertyFn);
+}
+
+
+///
+/// The given Decl must be an ObjCImplementationDecl. \@synthesize
+/// is illegal within a category.
+/// What gets generated here is:
+/// - (void) addToXXX:(id) value
+/// {
+///   mulle_eo_object_add_to_container( self, 0x10, value);
+/// }
+void CodeGenFunction::GenerateObjCAdder(ObjCImplementationDecl *IMP,
+                                         const ObjCPropertyImplDecl *PID) {
+  const ObjCPropertyDecl *PD = PID->getPropertyDecl();
+  ObjCMethodDecl *OMD = PD->getAdderMethodDecl();
+  assert(OMD && "Invalid call to generate container adder (empty method)");
+  StartObjCMethod(OMD, IMP->getClassInterface());
+
+  generateObjCAdderBody(IMP, PID, OMD);
+
+  FinishFunction();
+}
+
+///
+/// The given Decl must be an ObjCImplementationDecl. \@synthesize
+/// is illegal within a category.
+void CodeGenFunction::GenerateObjCRemover(ObjCImplementationDecl *IMP,
+                                         const ObjCPropertyImplDecl *PID) {
+  const ObjCPropertyDecl *PD = PID->getPropertyDecl();
+  ObjCMethodDecl *OMD = PD->getRemoverMethodDecl();
+  assert(OMD && "Invalid call to generate container remover (empty method)");
+  StartObjCMethod(OMD, IMP->getClassInterface());
+
+  generateObjCRemoverBody(IMP, PID, OMD);
+
+  FinishFunction();
+}
+// @mulle-objc@ new property attributes container <<<
 
 namespace {
   struct DestroyIvar final : EHScopeStack::Cleanup {
@@ -1821,6 +2484,10 @@ void CodeGenFunction::EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S){
   // collection object.
   JumpDest AfterBody = getJumpDestInCurrentScope("forcoll.next");
 
+  // @mulle-objc@ MetaABI: needed to change fastenumeration parameters >
+  RValue CountRV;
+  // @mulle-objc@ MetaABI: needed to change fastenumeration parameters <
+
   // Send it our message:
   CallArgList Args;
 
@@ -1841,11 +2508,28 @@ void CodeGenFunction::EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S){
   llvm::Constant *Count = llvm::ConstantInt::get(NSUIntegerTy, NumItems);
   Args.add(RValue::get(Count), getContext().getNSUIntegerType());
 
-  // Start the enumeration.
-  RValue CountRV =
+  // @mulle-objc@ MetaABI: needed to change fastenumeration parameters >
+  if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     CountRV = CGM.getObjCRuntime().EmitFastEnumeratorCall( *this,
+                                                           ReturnValueSlot(),
+                                                           getContext().getNSUIntegerType(),
+                                                           FastEnumSel,
+                                                           Collection,
+                                                           StatePtr.getPointer(), StateTy,
+                                                           ItemsPtr.getPointer(), ItemsTy,
+                                                           Count, getContext().getNSUIntegerType());
+  }
+  else
+  {
+   // Start the enumeration.
+  CountRV =
       CGM.getObjCRuntime().GenerateMessageSend(*this, ReturnValueSlot(),
                                                getContext().getNSUIntegerType(),
                                                FastEnumSel, Collection, Args);
+
+  }
+  // @mulle-objc@ MetaABI: needed to change fastenumeration parameters <
 
   // The initial number of objects that were returned in the buffer.
   llvm::Value *initialBufferLimit = CountRV.getScalarVal();
@@ -2051,10 +2735,24 @@ void CodeGenFunction::EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S){
   // Otherwise, we have to fetch more elements.
   EmitBlock(FetchMoreBB);
 
-  CountRV =
+   // @mulle-objc@ fastenumeration >
+  if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     CountRV = CGM.getObjCRuntime().EmitFastEnumeratorCall( *this,
+                                                           ReturnValueSlot(),
+                                                           getContext().getNSUIntegerType(),
+                                                           FastEnumSel,
+                                                           Collection,
+                                                           StatePtr.getPointer(), StateTy,
+                                                           ItemsPtr.getPointer(), ItemsTy,
+                                                           Count, getContext().getNSUIntegerType());
+  }
+  else
+    CountRV =
       CGM.getObjCRuntime().GenerateMessageSend(*this, ReturnValueSlot(),
                                                getContext().getNSUIntegerType(),
                                                FastEnumSel, Collection, Args);
+   // @mulle-objc@ fastenumeration <
 
   // If we got a zero count, we're done.
   llvm::Value *refetchCount = CountRV.getScalarVal();
@@ -2725,7 +3423,44 @@ void CodeGenFunction::EmitObjCAutoreleasePoolPop(llvm::Value *value) {
 /// Where alloc is declared as: + (id) alloc; in NSAutoreleasePool class.
 /// init is declared as: - (id) init; in its NSObject super class.
 ///
+extern "C"
+{
+   extern uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+}
+
 llvm::Value *CodeGenFunction::EmitObjCMRRAutoreleasePoolPush() {
+   // [NSAutoreleasePool alloc]
+   // @mulle-objc@ language: > use _MulleAutoreleasePoolPush
+  if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+    uint32_t      hash;
+    llvm::Value   *value;
+    std::string   name;
+    llvm::FunctionCallee fn;
+
+    hash = 0;
+    name = CGM.getLangOpts().ObjCUniverseName;
+    if( name.length())
+      hash = MulleObjCUniqueIdHashForString( name);
+
+    const llvm::APInt HashConstant(32, hash);
+    value = (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty,HashConstant);
+    /// Perform an operation having the signature
+    ///   void* (int)
+    llvm::FunctionType *fnType =
+      llvm::FunctionType::get(CGM.Int8PtrTy, CGM.IntTy, false);
+    fn = CGM.CreateRuntimeFunction(fnType, "_MulleAutoreleasePoolPush");
+
+    value = Builder.CreateBitCast(value, CGM.IntTy);
+
+    // Call the function.
+    llvm::CallBase *Inst = EmitCallOrInvoke(fn, value);
+
+    // Cast the result back to id.
+    return Builder.CreateBitCast(Inst, ConvertType( getContext().getObjCIdType()));
+  }
+  // @mulle-objc@ language: < use _MulleAutoreleasePoolPush
+
   CGObjCRuntime &Runtime = CGM.getObjCRuntime();
   llvm::Value *Receiver = Runtime.EmitNSAutoreleasePoolClassRef(*this);
   // [NSAutoreleasePool alloc]
@@ -2776,7 +3511,9 @@ llvm::Value *CodeGenFunction::EmitObjCAllocInit(llvm::Value *value,
 /// Produce the code to do a primitive release.
 /// [tmp drain];
 void CodeGenFunction::EmitObjCMRRAutoreleasePoolPop(llvm::Value *Arg) {
-  IdentifierInfo *II = &CGM.getContext().Idents.get("drain");
+// @mulle-objc@ > use release not drain for MulleObjC Autoreleasepool
+  IdentifierInfo *II = &CGM.getContext().Idents.get( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI() ? "release" : "drain");
+// @mulle-objc@ < use release not drain for MulleObjC Autoreleasepool
   Selector DrainSel = getContext().Selectors.getSelector(0, &II);
   CallArgList Args;
   CGM.getObjCRuntime().GenerateMessageSend(*this, ReturnValueSlot(),

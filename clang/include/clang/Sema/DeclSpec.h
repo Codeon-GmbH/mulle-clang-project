@@ -877,10 +877,14 @@ public:
     DQ_CSNullability = 0x40
   };
 
+
   ObjCDeclSpec()
       : objcDeclQualifier(DQ_None),
         PropertyAttributes(ObjCPropertyAttribute::kind_noattr), Nullability(0),
-        GetterName(nullptr), SetterName(nullptr) {}
+        GetterName(nullptr), SetterName(nullptr)
+  // @mulle-objc@ new property attributes container >
+        ,AdderName(nullptr), RemoverName(nullptr) {}
+  // @mulle-objc@ new property attributes container <
 
   ObjCDeclQualifier getObjCDeclQualifier() const {
     return (ObjCDeclQualifier)objcDeclQualifier;
@@ -941,6 +945,24 @@ public:
     SetterNameLoc = loc;
   }
 
+  // @mulle-objc@ new property attribute container >
+  const IdentifierInfo *getAdderName() const { return AdderName; }
+  IdentifierInfo *getAdderName() { return AdderName; }
+  SourceLocation getAdderNameLoc() const { return AdderNameLoc; }
+  void setAdderName(IdentifierInfo *name, SourceLocation loc) {
+    AdderName = name;
+    AdderNameLoc = loc;
+  }
+
+  const IdentifierInfo *getRemoverName() const { return RemoverName; }
+  IdentifierInfo *getRemoverName() { return RemoverName; }
+  SourceLocation getRemoverNameLoc() const { return RemoverNameLoc; }
+  void setRemoverName(IdentifierInfo *name, SourceLocation loc) {
+    RemoverName = name;
+    RemoverNameLoc = loc;
+  }
+  // @mulle-objc@ new property attribute container <
+
 private:
   // FIXME: These two are unrelated and mutually exclusive. So perhaps
   // we can put them in a union to reflect their mutual exclusivity
@@ -959,6 +981,12 @@ private:
   SourceLocation GetterNameLoc; // location of the getter attribute's value
   SourceLocation SetterNameLoc; // location of the setter attribute's value
 
+  // @mulle-objc@ new property attribute container >
+  IdentifierInfo *AdderName;    // getter name or NULL if no getter
+  IdentifierInfo *RemoverName;    // setter name or NULL if no setter
+  SourceLocation AdderNameLoc; // location of the getter attribute's value
+  SourceLocation RemoverNameLoc; // location of the setter attribute's value
+  // @mulle-objc@ new property attribute container <
 };
 
 /// Describes the kind of unqualified-id parsed.

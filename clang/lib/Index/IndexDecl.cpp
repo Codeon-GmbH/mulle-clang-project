@@ -527,6 +527,15 @@ public:
     if (ObjCMethodDecl *MD = D->getSetterMethodDecl())
       if (MD->getLexicalDeclContext() == D->getLexicalDeclContext())
         handleObjCMethod(MD, D);
+    // @mulle-objc@ new property attribute container >
+    // shouldn't do anything yet, since we have no adder= or remover= yet
+    if (ObjCMethodDecl *MD = D->getAdderMethodDecl())
+      if (MD->getLexicalDeclContext() == D->getLexicalDeclContext())
+        handleObjCMethod(MD, D);
+    if (ObjCMethodDecl *MD = D->getRemoverMethodDecl())
+      if (MD->getLexicalDeclContext() == D->getLexicalDeclContext())
+        handleObjCMethod(MD, D);
+    // @mulle-objc@ new property attribute container <
     TRY_DECL(D, IndexCtx.handleDecl(D));
     if (IBOutletCollectionAttr *attr = D->getAttr<IBOutletCollectionAttr>())
       IndexCtx.indexTypeSourceInfo(attr->getInterfaceLoc(), D,
@@ -564,6 +573,21 @@ public:
       if (MD->isPropertyAccessor() && !hasUserDefined(MD, Container))
         IndexCtx.handleDecl(MD, Loc, AccessorMethodRoles, {}, Container);
     }
+    // @mulle-objc@ new property attribute container >
+    // MEMO: I don't really know what this does, copy pasted from above
+    //       suspicion: unused until we add adder=,remover=
+    if (ObjCMethodDecl *MD = PD->getAdderMethodDecl()) {
+      if (MD->isPropertyAccessor() &&
+          !hasUserDefined(MD, Container))
+        IndexCtx.handleDecl(MD, Loc, AccessorMethodRoles, {}, Container);
+    }
+    if (ObjCMethodDecl *MD = PD->getRemoverMethodDecl()) {
+      if (MD->isPropertyAccessor() &&
+          !hasUserDefined(MD, Container))
+        IndexCtx.handleDecl(MD, Loc, AccessorMethodRoles, {}, Container);
+    }
+    // @mulle-objc@ new property attribute container <
+
     if (ObjCIvarDecl *IvarD = D->getPropertyIvarDecl()) {
       if (IvarD->getSynthesize()) {
         // For synthesized ivars, use the location of its name in the

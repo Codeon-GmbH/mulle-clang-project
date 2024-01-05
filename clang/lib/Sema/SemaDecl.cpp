@@ -935,6 +935,17 @@ Sema::NameClassification Sema::ClassifyName(Scope *S, CXXScopeSpec &SS,
   // FIXME: This lookup really, really needs to be folded in to the normal
   // unqualified lookup mechanism.
   if (SS.isEmpty() && CurMethod && !isResultTypeOrTemplate(Result, NextToken)) {
+   // @mulle-objc@ MetaABI: Lookup _param-><name> >
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      FieldDecl   *FD;
+
+      FD = CurMethod->FindParamRecordField( Name);
+      if( FD) //
+        return( NameClassification::NonType(cast<NamedDecl>( FD)));
+   }
+   // @mulle-objc@ MetaABI: Lookup _param-><name> <
+
     DeclResult Ivar = LookupIvarInObjCMethod(Result, S, Name);
     if (Ivar.isInvalid())
       return NameClassification::Error();
@@ -1286,8 +1297,23 @@ ExprResult Sema::ActOnNameClassifiedAsNonType(Scope *S, const CXXScopeSpec &SS,
                                               SourceLocation NameLoc,
                                               const Token &NextToken) {
   if (getCurMethodDecl() && SS.isEmpty())
-    if (auto *Ivar = dyn_cast<ObjCIvarDecl>(Found->getUnderlyingDecl()))
-      return BuildIvarRefExpr(S, NameLoc, Ivar);
+  // @mulle-objc@ MetaABI: Lookup _param-><name> >
+  {
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      FieldDecl   *FD;
+
+      FD = getCurMethodDecl()->FindParamRecordField( Found->getDeclName().getAsIdentifierInfo());
+      if( FD) //
+        return( GetMulle_paramFieldExpr( FD, S, NameLoc));
+  }
+  // @mulle-objc@ MetaABI: Lookup _param-><name> <
+
+  if (auto *Ivar = dyn_cast<ObjCIvarDecl>(Found->getUnderlyingDecl()))
+    return BuildIvarRefExpr(S, NameLoc, Ivar);
+  // @mulle-objc@ MetaABI: Lookup _param-><name> >
+  }
+  // @mulle-objc@ MetaABI: Lookup _param-><name> <
 
   // Reconstruct the lookup result.
   LookupResult Result(*this, Found->getDeclName(), NameLoc, LookupOrdinaryName);
@@ -1301,6 +1327,7 @@ ExprResult Sema::ActOnNameClassifiedAsNonType(Scope *S, const CXXScopeSpec &SS,
 ExprResult Sema::ActOnNameClassifiedAsOverloadSet(Scope *S, Expr *E) {
   // For an implicit class member access, transform the result into a member
   // access expression if necessary.
+
   auto *ULE = cast<UnresolvedLookupExpr>(E);
   if ((*ULE->decls_begin())->isCXXClassMember()) {
     CXXScopeSpec SS;
@@ -2223,6 +2250,9 @@ static void CheckPoppedLabel(LabelDecl *L, Sema &S,
 }
 
 void Sema::ActOnPopScope(SourceLocation Loc, Scope *S) {
+/// @mulle-objc@ protect mulle-objc from NRVO >
+  if( getLangOpts().CPlusPlus)
+/// @mulle-objc@ protect mulle-objc from NRVO <
   S->applyNRVO();
 
   if (S->decl_empty()) return;
@@ -2606,6 +2636,15 @@ void Sema::MergeTypedefNameDecl(Scope *S, TypedefNameDecl *New,
       // Install the built-in type for 'Class', ignoring the current definition.
       New->setTypeForDecl(Context.getObjCClassType().getTypePtr());
       return;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case 8:
+      if (!TypeID->isStr("PROTOCOL"))
+        break;
+      Context.setObjCPROTOCOLRedefinitionType(New->getUnderlyingType());
+      // Install the built-in type for 'PROTOCOL', ignoring the current definition.
+      New->setTypeForDecl(Context.getObjCPROTOCOLType().getTypePtr());
+      return;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
     case 3:
       if (!TypeID->isStr("SEL"))
         break;

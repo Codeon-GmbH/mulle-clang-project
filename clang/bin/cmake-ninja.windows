@@ -1,0 +1,85 @@
+#! /bin/sh
+
+# It's assumed that the mono repo is unpacked in the current directory as
+# mulle-clang-project. Lets build it in 'build'.
+#
+# If you are in a docker container or VM or otherwise a fresh install use
+# mulle-clang-project/clang/bin/install-prerequisites
+#
+# MEMO: If you can't use ninja copy this file and make it cmake-make or so.
+
+PREFIX="${PREFIX:-${HOME}}"
+# VERSION / RC are passed in via mulle-clang-cpack
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.6.0}${RC}"
+
+if [ ! -d "${INSTALL_PREFIX}" ]
+then
+   mkdir -p "${INSTALL_PREFIX}" || exit 1
+fi
+
+[ ! -d build ] && mkdir build
+
+cd build &&
+cmake.exe \
+   -DLLVM_BUILD_LLVM_DYLIB='ON' \
+   -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+   -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx"  \
+   -DLLVM_LINK_LLVM_DYLIB=ON \
+   -DLLVM_PARALLEL_LINK_JOBS=2 \
+   -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+\
+   -DCLANG_VENDOR='mulle' \
+\
+   -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
+   -DCMAKE_INSTALL_MESSAGE='LAZY' \
+   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+\
+   -Thost=x64 \
+   -G Ninja \
+   ${CMAKEFLAGS} \
+   ../mulle-clang-project/llvm &&
+ninja.exe ${NINJAFLAGS} "$@"  &&
+echo "Ninja install with sudo may require a password" >&2 &&
+${INSTALL_SUDO} ninja.exe ${NINJAFLAGS} ${INSTALLFLAGS} install  &&
+(
+   ${INSTALL_SUDO} cd "${INSTALL_PREFIX}/bin" || exit 1
+
+   # remove possible older mulle-stuff from previous build
+   ${INSTALL_SUDO} rm mulle-* 2> /dev/null
+
+   # rename stuff we need to mulle
+   ${INSTALL_SUDO} mv llvm-nm.exe mulle-nm.exe &&
+
+   for i in scan-build* clang-cl.exe
+   do
+      ${INSTALL_SUDO} mv "$i" mulle-"$i"
+   done &&
+
+   # junk rest
+   for i in *
+   do
+      case "$i" in
+         *.dll|mulle-*)
+         ;;
+
+         *)
+            ${INSTALL_SUDO} rm "$i" || exit 1
+         ;;
+      esac
+   done
+) &&
+(
+   # pass in INSTALL_SUDO via env if needed
+   #
+   # remove more stuff we don't need for the compiler and scanbuild
+   # to keep the compiler package down
+   #
+   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLLVM*.a
+   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libc++*
+   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang*.a
+   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang.*
+   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.so
+   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLTO.so*
+   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.so*
+   ${INSTALL_SUDO} rm -rf "${INSTALL_PREFIX}"/include/
+)

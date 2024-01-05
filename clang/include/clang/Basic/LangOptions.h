@@ -420,6 +420,10 @@ public:
 
   std::string ObjCConstantStringClass;
 
+  /// @mulle-objc@ Universe >
+  std::string ObjCUniverseName;
+  /// @mulle-objc@ Universe <
+
   /// The name of the handler function to be called when -ftrapv is
   /// specified.
   ///

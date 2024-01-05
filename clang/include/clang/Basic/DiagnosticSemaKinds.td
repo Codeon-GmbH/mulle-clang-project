@@ -1275,6 +1275,9 @@ def note_direct_method_declared_at : Note<"direct method %0 declared here">;
 def note_property_attribute : Note<"property %0 is declared "
   "%select{deprecated|unavailable|partial}1 here">;
 def err_setter_type_void : Error<"type of setter must be void">;
+// @mulle-objc@ new property attribute container >
+def err_property_method_type_void : Error<"type of %0 must be void">;
+// @mulle-objc@ new property attribute container <
 def err_duplicate_method_decl : Error<"duplicate declaration of method %0">;
 def warn_duplicate_method_decl :
   Warning<"multiple declarations of method %0 found and ignored">,
@@ -7451,6 +7454,49 @@ def err_attribute_arm_mve_polymorphism : Error<
 def err_attribute_webassembly_funcref : Error<
   "'__funcref' attribute can only be applied to a function pointer type">;
 
+// @mulle-objc@ compiler: error message definitions begin >
+def error_mulle_aam_ivar_access : Error<"in AAM instance variables such as %0 are not accessible">, AccessControl;
+def err_mulle_aam_unsupported_method_family : Error<
+"in AAM method %0 can not be defined, use a non AAM category">;
+def err_mulle_aam_illegal_explicit_message : Error<
+"in AAM method %0 is not available">;
+def err_mulle_aam_illegal_retained_message : Error<
+"in AAM method %0 is not available, because it returns a retained object">;
+def err_mulle_aam_illegal_consumed_message : Error<
+"in AAM method %0 is not available, because it needs a retained argument">;
+def err_mulle_objc_runtime_function_missing : Error<
+"the mulle-objc runtime function %0 has not been declared yet">;
+def err_mulle_objc_property_synthesize_wrong_name : Error<
+"the mulle-objc runtime synthesized instance variable name must be the name of the property, prefixed by an underscore.">;
+def err_mulle_objc_no_property_dot_expression : Error<
+"the mulle-objc runtime does not support . expressions with properties, use regular method calls">;
+def err_mulle_error_missing_property_ivar_decl : Error<
+  "synthesized property %0 needs a compatible"
+  " instance variable of the same name, prefixed with an underscore.">;
+// these are really CodeGen errors
+def err_mulle_objc_preprocessor_not_integer_value : Error<
+  "special preprocessor directives for the mulle-objc runtime must be integers only">;
+def err_mulle_objc_preprocessor_missing_include : Error<
+  "missing #include <mulle-objc-runtime/mulle-objc-runtime.h> in compilation. Can not emit runtime information">;
+def err_mulle_objc_compiler_info_malformed : Error<
+  "JIT struct __mulle_objc_compiler_info must be a struct { unsigned int runtime_version, load_version; }">;
+def err_mulle_objc_runtime_version_mismatch: Error<
+   "the runtime load version %0 is not compatible with this compiler %1">;
+def err_mulle_objc_hash_invalid: Error<
+   "Your string '%0' hashed to an invalid value. Please tweet it to @mulle_nat then reword it">;
+def err_mulle_objc_setjmp_not_included: Error<
+   "include <setjmp.h> before using Mulle ObjC exceptions">;
+def err_mulle_objc_jmpbuf_size_unknown: Error<
+   "the compiler failed to figure out sizeof( struct jmpbuf)">;
+def err_mulle_objc_universename_not_a_string: Error<
+   "the universename '%0' must be a string (in double quotes)">;
+def err_mulle_objc_universename_not_an_identifier: Error<
+   "the universename '%0' must only contain lowercase identifier characters">;
+def err_mulle_dynamic_property_synthesize  : Error<
+  "%0 is a dynamic property, that can not be synthesized">;
+
+// @mulle-objc@ compiler: error message definitions end <
+
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "
   "use @synthesize, @dynamic or provide a method implementation "
@@ -9837,6 +9883,10 @@ def err_msvc_annotation_wide_str : Error<
 // CFString checking
 def err_cfstring_literal_not_string_constant : Error<
   "CFString literal is not a string constant">;
+// @mulle-objc@ literal is not ASCII >
+def err_mulle_nsstring_literal_not_ascii : Error<
+  "NSString literal is not ASCII">;
+// @mulle-objc@ literal is not ASCII <
 def warn_cfstring_truncated : Warning<
   "input conversion stopped due to an input byte that does not "
   "belong to the input codeset UTF-8">,

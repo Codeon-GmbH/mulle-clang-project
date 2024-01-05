@@ -710,6 +710,16 @@ StringRef PredefinedExpr::getIdentKindName(PredefinedExpr::IdentKind IK) {
     return "__FUNCDNAME__";
   case LFunction:
     return "L__FUNCTION__";
+  // @mulle-objc@ > add __OBJC_CLASS__ keyword
+  case ObjCClass:
+     return "__OBJC_CLASS__";
+  case ObjCCategory:
+     return "__OBJC_CATEGORY__";
+  case MulleObjCClassid:
+     return "__MULLE_OBJC_CLASSID__";
+  case MulleObjCCategoryid:
+     return "__MULLE_OBJC_CATEGORYID__";
+  // @mulle-objc@ < add __OBJC_CLASS__ keyword
   case PrettyFunction:
     return "__PRETTY_FUNCTION__";
   case FuncSig:
@@ -722,10 +732,77 @@ StringRef PredefinedExpr::getIdentKindName(PredefinedExpr::IdentKind IK) {
   llvm_unreachable("Unknown ident kind for PredefinedExpr");
 }
 
+// @mulle-objc@ > add __OBJC_CLASS__ keyword
+static std::string  getObjCClassName( const DeclContext *DC)
+{
+   for(; DC; DC = DC->getParent())
+   {
+      switch (DC->getDeclKind()) {
+         case Decl::ObjCCategory:
+         {
+            const ObjCCategoryDecl *OD = dyn_cast<ObjCCategoryDecl>( Decl::castFromDeclContext( DC));
+
+            return OD->getClassInterface()->getIdentifier()->getName().str();
+         }
+         case Decl::ObjCCategoryImpl:
+         {
+            const ObjCCategoryImplDecl *OD = dyn_cast<ObjCCategoryImplDecl>( Decl::castFromDeclContext( DC));
+
+            return OD->getClassInterface()->getIdentifier()->getName().str();
+         }
+         case Decl::ObjCImplementation:
+         case Decl::ObjCInterface:
+         case Decl::ObjCProtocol:
+         {
+            const ObjCContainerDecl *OD = dyn_cast<ObjCContainerDecl>( Decl::castFromDeclContext( DC));
+            return OD->getIdentifier()->getName().str();
+         }
+         default:;
+      }
+   }
+   return "";
+}
+
+static std::string  getObjCCategoryName(const DeclContext *DC)
+{
+   for(; DC; DC = DC->getParent())
+   {
+      switch (DC->getDeclKind()) {
+         case Decl::ObjCCategory:
+         {
+            const ObjCCategoryDecl *OD = dyn_cast<ObjCCategoryDecl>( Decl::castFromDeclContext( DC));
+
+            return OD->getIdentifier()->getName().str();
+         }
+         break;
+
+         case Decl::ObjCCategoryImpl:
+         {
+            const ObjCCategoryImplDecl *OD = dyn_cast<ObjCCategoryImplDecl>( Decl::castFromDeclContext( DC));
+
+            return OD->getIdentifier()->getName().str();
+         }
+         default:;
+      }
+   }
+   return "";
+}
+// @mulle-objc@ < add __OBJC_CLASS__ keyword
+
+
 // FIXME: Maybe this should use DeclPrinter with a special "print predefined
 // expr" policy instead.
 std::string PredefinedExpr::ComputeName(IdentKind IK, const Decl *CurrentDecl) {
   ASTContext &Context = CurrentDecl->getASTContext();
+
+  // @mulle-objc@ > add __OBJC_CLASS__ keyword
+  if (IK == PredefinedExpr::ObjCClass || IK == PredefinedExpr::MulleObjCClassid) {
+     return( getObjCClassName( CurrentDecl->getDeclContext()));
+  }
+  if (IK == PredefinedExpr::ObjCCategory || IK == PredefinedExpr::MulleObjCCategoryid) {
+     return( getObjCCategoryName( CurrentDecl->getDeclContext()));
+  }
+  // @mulle-objc@ < add __OBJC_CLASS__ keyword
 
   if (IK == PredefinedExpr::FuncDName) {
     if (const NamedDecl *ND = dyn_cast<NamedDecl>(CurrentDecl)) {
@@ -3332,6 +3409,17 @@ bool Expr::isConstantInitializer(ASTContext &Ctx, bool IsForRef,
   case StringLiteralClass:
   case ObjCEncodeExprClass:
     return true;
+  // @mulle-objc@: allow @selector as compile-time constant
+  case ObjCSelectorExprClass:
+     if( Ctx.getLangOpts().ObjCRuntime.hasConstantSelector())
+        return true;
+     break;
+  case ObjCProtocolExprClass:
+     if( Ctx.getLangOpts().ObjCRuntime.hasConstantProtocol())
+        return true;
+     break;
+  // @mulle-objc@: allow @selector as compile-time constant <-
+
   case CXXTemporaryObjectExprClass:
   case CXXConstructExprClass: {
     const CXXConstructExpr *CE = cast<CXXConstructExpr>(this);

@@ -3409,6 +3409,9 @@ static bool TypeInfoIsInStandardLibrary(const BuiltinType *Ty) {
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
       llvm_unreachable("FIXME: Objective-C types are unsupported!");
   }
 

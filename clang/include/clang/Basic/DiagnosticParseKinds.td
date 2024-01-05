@@ -503,6 +503,14 @@ def err_objc_expected_equal_for_setter : Error<
   "expected '=' for Objective-C setter">;
 def err_objc_expected_selector_for_getter_setter : Error<
   "expected selector for Objective-C %select{setter|getter}0">;
+
+// @mulle-objc@ new property attributes container >
+def err_objc_expected_equal_for_method : Error<
+  "expected '=' for Objective-C %0">;
+def err_objc_expected_selector_for_method : Error<
+  "expected selector for Objective-C %0">;
+// @mulle-objc@ new property attributes container <
+
 def err_objc_property_requires_field_name : Error<
   "property requires fields to be named">;
 def err_objc_property_bitfield : Error<"property name cannot be a bit-field">;
@@ -1541,6 +1549,18 @@ def warn_omp_more_one_omp_all_memory : Warning<
 def warn_omp_depend_in_ordered_deprecated : Warning<"'depend' clause for"
   " 'ordered' is deprecated; use 'doacross' instead">, InGroup<Deprecated>;
 
+// @mulle-objc@ Mulle ObjC diagnostics >
+def err_mulle_objc_no_nullable : Error<
+  "nullable is not supported in Mulle ObjC (everything is nullable by default)">;
+def err_mulle_objc_no_package : Error<
+  "@package is not supported in Mulle ObjC">;
+def err_mulle_objc_no_class_extension : Error<
+  "Class extensions are not really supported in Mulle ObjC">;
+def err_mulle_objc_no_cpp_generics : Error<
+  "C++ like generics are not supported in Mulle ObjC">;
+def err_mulle_objc_no_support_for_property_modifier  : Error<
+  "%0 is a property attribute that is is not supported in Mulle ObjC">;
+// @mulle-objc@ Mulle ObjC diagnostics <
 // Pragma loop support.
 def err_pragma_loop_missing_argument : Error<
   "missing argument; expected %select{an integer value|"

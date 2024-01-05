@@ -1,0 +1,106 @@
+#! /bin/sh
+
+# It's assumed that the mono repo is unpacked in the current directory as
+# mulle-clang-project. Lets build it in 'build'.
+#
+# If you are in a docker container or VM or otherwise a fresh install use
+# mulle-clang-project/clang/bin/install-prerequisites
+#
+# MEMO: If you can't use ninja copy this file and make it cmake-make or so.
+# TODO: incorporate flags -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON (https://github.com/msys2/MINGW-packages/issues/13667)#
+#                         -DCLANG_DEFAULT_RTLIB=compiler-rt
+#                         -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON
+#                         -DCLANG_DEFAULT_UNWINDLIB=libunwind
+#       incorporate flags -DLLVM_ENABLE_PROJECTS="compiler-rt;clang" \
+#       -DLLVM_TARGETS_TO_BUILD=X86 \ ????
+#       -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF \
+#       -DCMAKE_BUILD_TYPE=Release -DLLVM_PARALLEL_COMPILE_JOBS=4 -DLLVM_PARALLEL_LINK_JOBS=1 \
+#       -DBUILD_SHARED_LIBS=ON -DLLVM_ENABLE_UNWIND_TABLES=OFF \
+#
+PREFIX="${PREFIX:-${HOME}}"
+# VERSION / RC are passed in via mulle-clang-cpack
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.6.0}${RC}"
+
+if [ ! -d "${INSTALL_PREFIX}" ]
+then
+   mkdir -p "${INSTALL_PREFIX}" || exit 1
+fi
+
+
+[ ! -d build ] && mkdir build
+
+# assume on windows, cmake uses the proper VS-Studio version as default, so we don't
+# specify a generator
+
+cd build &&
+cmake.exe \
+   -DLLVM_BUILD_LLVM_DYLIB='ON' \
+   -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+   -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx"  \
+   -DLLVM_LINK_LLVM_DYLIB=ON \
+   -DLLVM_PARALLEL_LINK_JOBS=2 \
+   -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+\
+   -DCLANG_VENDOR='mulle' \
+\
+   -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
+   -DCMAKE_INSTALL_MESSAGE='LAZY' \
+   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+\
+   -Thost=x64 \
+   ${CMAKEFLAGS} \
+   ../mulle-clang-project/llvm &&
+
+# fix cmake bugs...
+#
+# mulle-replace is part of https://github.com/mulle-nat/mulle-project/blob/release/mulle-replace
+# which also needs https://github.com/mulle-nat/mulle-bashfunctions
+#
+find . -name cmake_install.cmake -exec mulle-replace -g '$(Configuration)' "${CMAKE_BUILD_TYPE:-Release}"  {} \; -print &&
+
+cmake.exe --build . --config "${CMAKE_BUILD_TYPE:-Release}" &&
+cmake.exe --install . --config "${CMAKE_BUILD_TYPE:-Release}" &&
+(
+   cd "${INSTALL_PREFIX}/bin" || exit 1
+
+   # remove possible older mulle-stuff from previous build
+   rm mulle-* 2> /dev/null
+
+   # rename stuff we need to mulle
+   mv llvm-nm.exe mulle-nm.exe &&
+
+   for i in scan-build* clang-cl.exe
+   do
+      mv "$i" mulle-"$i"
+   done &&
+
+   # junk rest
+   for i in *
+   do
+      case "$i" in
+         *.dll|mulle-*)
+         ;;
+
+         *)
+            rm "$i" || exit 1
+         ;;
+      esac
+   done
+) &&
+(
+# pass in INSTALL_SUDO via env if needed
+:
+#
+# remove more stuff we don't need for the compiler and scanbuild
+# to keep the compiler package down
+#
+# ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLLVM*.lib
+# ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libc++*
+# ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang*.lib
+# ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang.*
+# ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.dll
+# ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLTO.dll
+# ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.dll
+# ${INSTALL_SUDO} rm -rf "${INSTALL_PREFIX}"/include/
+)
+

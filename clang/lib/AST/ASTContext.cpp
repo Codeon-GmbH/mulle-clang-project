@@ -1379,6 +1379,10 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
   InitBuiltinType(ObjCBuiltinIdTy, BuiltinType::ObjCId);
   InitBuiltinType(ObjCBuiltinClassTy, BuiltinType::ObjCClass);
   InitBuiltinType(ObjCBuiltinSelTy, BuiltinType::ObjCSel);
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  ///if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    InitBuiltinType(ObjCBuiltinProtocolTy, BuiltinType::ObjCProtocol);
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   if (LangOpts.OpenCL) {
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
@@ -1857,6 +1861,10 @@ bool ASTContext::isPromotableIntegerType(QualType T) const {
     case BuiltinType::Char8:
     case BuiltinType::Char16:
     case BuiltinType::Char32:
+    /// @mulle-objc@ uniqueid: make it integer promotable >
+    case BuiltinType::ObjCSel:
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: make it integer promotable <    
       return true;
     default:
       return false;
@@ -2180,10 +2188,21 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
       break;
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
-    case BuiltinType::ObjCSel:
       Width = Target->getPointerWidth(LangAS::Default);
       Align = Target->getPointerAlign(LangAS::Default);
       break;
+    // @mulle-objc@ uniqueid: -> INCOMPATIBLE! change SEL to IntWidth, IntAlign
+    case BuiltinType::ObjCSel:
+      Width = Target->getIntWidth();
+      Align = Target->getIntAlign();
+      break;
+    // @mulle-objc@ uniqueid: <-
+    // @mulle-objc@ uniqueid: -> INCOMPATIBLE! change PROTOCOL to IntWidth, IntAlign
+    case BuiltinType::ObjCProtocol:
+       Width = Target->getIntWidth();
+       Align = Target->getIntAlign();
+       break;
+    // @mulle-objc@ uniqueid: <-
     case BuiltinType::OCLSampler:
     case BuiltinType::OCLEvent:
     case BuiltinType::OCLClkEvent:
@@ -7097,7 +7116,11 @@ unsigned ASTContext::getIntegerRank(const Type *T) const {
     return 3 + (getIntWidth(ShortTy) << 3);
   case BuiltinType::Int:
   case BuiltinType::UInt:
+  // @mulle-objc@ uniqueid: add ObjCSel/ObjCProtocol after UInt >
+  case BuiltinType::ObjCSel:
+  case BuiltinType::ObjCProtocol:
     return 4 + (getIntWidth(IntTy) << 3);
+  // @mulle-objc@ uniqueid: add ObjCSel/ObjCProtocol after UInt <
   case BuiltinType::Long:
   case BuiltinType::ULong:
     return 5 + (getIntWidth(LongTy) << 3);
@@ -7886,6 +7909,10 @@ ASTContext::getObjCPropertyImplDeclForPropertyDecl(
 /// kPropertyWeak = 'W'              // 'weak' property
 /// kPropertyStrong = 'P'            // property GC'able
 /// kPropertyNonAtomic = 'N'         // property non-atomic
+/// kPropertySerializable = 'E'      // property serializable (encodable)
+/// kPropertyContainer = 'K'         // property container (array)
+/// kPropertyGetter = '+',           // followed by adder selector name
+/// kPropertySetter = '-',           // followed by remover selector name
 /// };
 /// @endcode
 std::string
@@ -7903,9 +7930,14 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
       SynthesizePID = PropertyImpDecl;
   }
 
-  // FIXME: This is not very efficient.
-  std::string S = "T";
+  // @mulle-objc@ runtime: drop leading 'T' from property signature
+  std::string S;
 
+  if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+  // FIXME: This is not very efficient.
+     S = "T";
+  }
   // Encode result type.
   // GCC has some special rules regarding encoding of properties which
   // closely resembles encoding of ivars.
@@ -7933,6 +7965,19 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
   if (Dynamic)
     S += ",D";
 
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
+  // will only be emitted if non-implicitly declared as seriazable,
+  // because we want to do E= in the future
+  if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_container)
+    S += ",K";
+  if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_serializable)
+    S += ",E";
+  if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_observable)
+    S += ",O";
+  if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_relationship)
+    S += ",>";
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
+
   if (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_nonatomic)
     S += ",N";
 
@@ -7945,6 +7990,17 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
     S += ",S";
     S += PD->getSetterName().getAsString();
   }
+
+  // @mulle-objc@ new property attributes container >
+  if (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_adder) {
+    S += ",+";
+    S += PD->getAdderName().getAsString();
+  }
+  if (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_remover) {
+    S += ",-";
+    S += PD->getRemoverName().getAsString();
+  }
+  // @mulle-objc@ new property attributes container <
 
   if (SynthesizePID) {
     const ObjCIvarDecl *OID = SynthesizePID->getPropertyIvarDecl();
@@ -7986,6 +8042,38 @@ void ASTContext::getObjCEncodingForType(QualType T, std::string& S,
                                  .setIsOutermostType(),
                              Field, NotEncodedT);
 }
+
+// @mulle-objc@ added typeNeedsMetaABIAlloca function >
+
+// ez to remember for rval:
+// 1. if FP it's in _param,
+// 2. if __alignof__(x) > __alignof__( void *), it's in _param
+// 3. if sizeof(x) >sizeof( void *), it's in _param
+bool   ASTContext::typeNeedsMetaABIAlloca( QualType type)
+{
+   if( type->isIncompleteType())
+   {
+      if( type->isVoidType())
+         return( false);
+      return( true);
+   }
+
+   if( getTypeSize( type) > getTypeSize( VoidPtrTy))
+      return( true);
+   // should log this, as this is unusual
+   if( getTypeAlign( type) > getTypeAlign( VoidPtrTy))
+      return( true);
+   if( type->isFloatingType())
+      return( true);
+   if( type->isUnionType())
+      return( true);
+   if( type->isStructureOrClassType())
+      return( true);
+
+   return( false);
+}
+// @mulle-objc@ added typeNeedsMetaABIAlloca function <
+
 
 void ASTContext::getObjCEncodingForPropertyType(QualType T,
                                                 std::string& S) const {
@@ -8080,10 +8168,13 @@ static char getObjCEncodingForPrimitiveType(const ASTContext *C,
         return ' ';
       }
 
+   // @mulle-objc@ uniqueid: return ':' for ObjCSel (superflous?) >
+    case BuiltinType::ObjCProtocol:  // ??? what to do here (we are same as sel)
+    case BuiltinType::ObjCSel:    return ':';
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
-    case BuiltinType::ObjCSel:
       llvm_unreachable("@encoding ObjC primitive type");
+   // @mulle-objc@ uniqueid: return ':' for ObjCSel (superflous?) <
 
     // OpenCL and placeholder types don't need @encodings.
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
@@ -8210,6 +8301,14 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
   case Type::Enum:
     if (FD && FD->isBitField())
       return EncodeBitField(this, S, T, FD);
+
+    // @mulle-objc@ uniqueid: -> @encode( SEL), @encode( PROTOCOL) >
+    if (T->isObjCSelType() || T->isObjCProtocolType()) {
+       S += ':';
+       return;
+    }
+    // @mulle-objc@ uniqueid: -> @encode( SEL), @encode( PROTOCOL) <
+
     if (const auto *BT = dyn_cast<BuiltinType>(CT))
       S += getObjCEncodingForPrimitiveType(this, BT);
     else
@@ -8237,15 +8336,20 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
     QualType PointeeTy;
     if (isa<PointerType>(CT)) {
       const auto *PT = T->castAs<PointerType>();
-      if (PT->isObjCSelType()) {
+      // @mulle-objc@ uniqueid: -> @encode( SEL), @encode( PROTOCOL) >
+      if (PT->isObjCSelType() || PT->isObjCProtocolType()) {
+        S += '^';
         S += ':';
         return;
       }
+      // @mulle-objc@ uniqueid: <- @encode( SEL), @encode( PROTOCOL) <
       PointeeTy = PT->getPointeeType();
     } else {
       PointeeTy = T->castAs<ReferenceType>()->getPointeeType();
     }
 
+    // @mulle-objc@ @encode suppress type qualifiers like const >
+#if 0
     bool isReadOnly = false;
     // For historical/compatibility reasons, the read-only qualifier of the
     // pointee gets emitted _before_ the '^'.  The read-only qualifier of
@@ -8272,6 +8376,8 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string &S,
       if (StringRef(S).endswith("nr"))
         S.replace(S.end()-2, S.end(), "rn");
     }
+#endif
+    // @mulle-objc@ @encode suppress type qualifiers like const <
 
     if (PointeeTy->isCharType()) {
       // char pointer types should be encoded as '*' unless it is a
@@ -8701,6 +8807,8 @@ void ASTContext::getObjCEncodingForStructureImpl(RecordDecl *RDecl,
 
 void ASTContext::getObjCEncodingForTypeQualifier(Decl::ObjCDeclQualifier QT,
                                                  std::string& S) const {
+  // @mulle-objc@ @encode suppress type qualifiers like byref, oneway >
+  // strangely though, currently not suppressed ?
   if (QT & Decl::OBJC_TQ_In)
     S += 'n';
   if (QT & Decl::OBJC_TQ_Inout)
@@ -8713,6 +8821,7 @@ void ASTContext::getObjCEncodingForTypeQualifier(Decl::ObjCDeclQualifier QT,
     S += 'R';
   if (QT & Decl::OBJC_TQ_Oneway)
     S += 'V';
+  // @mulle-objc@ @encode suppress type qualifiers like byref, oneway <
 }
 
 TypedefDecl *ASTContext::getObjCIdDecl() const {
@@ -8726,7 +8835,10 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
-    QualType T = getPointerType(ObjCBuiltinSelTy);
+    // @mulle-objc@ uniqueid: change SEL type
+    QualType T = getLangOpts().ObjCRuntime.hasConstantSelector()
+                     ? ObjCBuiltinSelTy
+                     : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");
   }
   return ObjCSelDecl;
@@ -8742,18 +8854,33 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
 }
 
 ObjCInterfaceDecl *ASTContext::getObjCProtocolDecl() const {
-  if (!ObjCProtocolClassDecl) {
-    ObjCProtocolClassDecl
-      = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
-                                  SourceLocation(),
-                                  &Idents.get("Protocol"),
-                                  /*typeParamList=*/nullptr,
-                                  /*PrevDecl=*/nullptr,
-                                  SourceLocation(), true);
+   if (!ObjCProtocolClassDecl) {
+     ObjCProtocolClassDecl
+       = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
+                                   SourceLocation(),
+                                   &Idents.get("Protocol"),
+                                   /*typeParamList=*/nullptr,
+                                   /*PrevDecl=*/nullptr,
+                                   SourceLocation(), true);
+   }
+
+   return ObjCProtocolClassDecl;
+}
+
+/// @mulle-objc@ uniqueid: change type of PROTOCOL to pointer >
+/// INCOMPATIBLE!
+TypedefDecl *ASTContext::getObjCPROTOCOLDecl() const {
+  if (!ObjCPROTOCOLDecl) {
+     QualType T = getLangOpts().ObjCRuntime.hasConstantProtocol()
+                      ? ObjCBuiltinProtocolTy
+                      : getPointerType(ObjCBuiltinProtocolTy);
+     ObjCPROTOCOLDecl = buildImplicitTypedef(T, "PROTOCOL");
   }
 
-  return ObjCProtocolClassDecl;
+  return ObjCPROTOCOLDecl;
 }
+/// @mulle-objc@ uniqueid: change type of PROTOCOL to pointer <
+/// the method below is not used for mulle-objc
 
 //===----------------------------------------------------------------------===//
 // __builtin_va_list Construction Functions
@@ -10572,6 +10699,19 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS, bool OfBlockPointer,
   if (LHSCan == RHSCan)
     return LHS;
 
+  /// @mulle-objc@ uniqueid: add builtin type for SEL / PROTOCOL >
+  if (LHSCan->isObjCSelType() && RHSCan == getCanonicalType( UnsignedIntTy))
+    return( UnsignedIntTy);
+  if (RHSCan->isObjCSelType() && LHSCan == getCanonicalType( UnsignedIntTy))
+    return( UnsignedIntTy);
+
+  if (LHSCan->isObjCProtocolType() && RHSCan == getCanonicalType( UnsignedIntTy))
+    return( UnsignedIntTy);
+  if (RHSCan->isObjCProtocolType() && LHSCan == getCanonicalType( UnsignedIntTy))
+    return( UnsignedIntTy);
+  /// @mulle-objc@ uniqueid: add builtin type for SEL / PROTOCOL <
+
+
   // If the qualifiers are different, the types aren't compatible... mostly.
   Qualifiers LQuals = LHSCan.getLocalQualifiers();
   Qualifiers RQuals = RHSCan.getLocalQualifiers();
@@ -10841,6 +10981,10 @@ QualType ASTContext::mergeTypes(QualType LHS, QualType RHS, bool OfBlockPointer,
   case Type::Enum:
     return {};
   case Type::Builtin:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL and SEL >
+    // allow conversion to unsigned int here ?
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL and SEL <
+
     // Only exactly equal builtin types are compatible, which is tested above.
     return {};
   case Type::Complex:

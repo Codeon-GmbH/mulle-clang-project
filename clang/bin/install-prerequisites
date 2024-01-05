@@ -1,0 +1,1046 @@
+#! /bin/sh
+#
+# mulle-clang install preequisites
+# (c) 2016 Codeon GmbH, coded by Nat!
+# BSD-3 License
+
+[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+
+
+
+#
+# cmake min for 7 is 3.4.2 (so still good), try to keep as low as possible
+# for distributions with old cmakes. That said 3.5.2 works for me
+#
+CMAKE_VERSION_MAJOR="3"
+CMAKE_VERSION_MINOR="5"
+CMAKE_VERSION_PATCH="2"
+
+
+#
+#
+#
+CMAKE_VERSION="${CMAKE_VERSION_MAJOR}.${CMAKE_VERSION_MINOR}"
+CMAKE_PATCH_VERSION="${CMAKE_VERSION}.${CMAKE_VERSION_PATCH}"
+
+
+usage()
+{
+   cat <<EOF >&2
+Usage:
+   install-prerequisites [options] [command]
+
+   Install prerequisites for llvm and mulle-clang. Useful for empty docker
+   containers or VMs.
+
+Options:
+EOF
+   (
+      cat <<EOF
+   --with-lldb          : build mulle-lldb
+   --no-ninja           : use make instead of ninja
+   --wsl                : build for windows inside the WSL
+   -n                   : dry run
+   -v                   : be verbose
+EOF
+      if [ "${VERBOSE}" = "YES" ]
+      then
+      cat <<EOF
+   --no-libcxx          : do not download libcxx
+   --no-compiler-rt     : do not download compiler runtime and sanitizers
+   --no-warn            : do not warn if a previous build exists
+   --no-python          : disable python (for lldb)
+   --python             : enable python (for lldb)
+   --prefix <dir>       : default install prefix
+   --target-arch <arch> : currently only ARM is supported on Ubuntu
+   --vs32bit            : compile for Visual Studo 32 bit
+EOF
+      fi
+   ) | sort >&2
+
+   if [ "${VERBOSE}" != "YES" ]
+   then
+      echo >&2
+      echo "   (Use -v to see more options)" >&2
+   fi
+
+
+   cat <<EOF >&2
+
+Commands:
+   install              : install
+EOF
+
+   exit 1
+}
+
+
+
+environment_initialize()
+{
+   MULLE_UNAME="`uname -s | tr '[A-Z]' '[a-z]'`"
+   case "${MULLE_UNAME}" in
+      mingw*)
+         CLANG_SUFFIX="-cl"
+         EXE_EXTENSION=".exe"
+         SYMLINK_PREFIX="~"
+         SUDO=
+      ;;
+
+      *)
+         SYMLINK_PREFIX="/usr/local"
+         SUDO="sudo"
+      ;;
+   esac
+}
+
+
+log_initialize()
+{
+   if [ -z "${NO_COLOR}" ]
+   then
+      case "${MULLE_UNAME}" in
+         darwin|linux|freebsd|mingw*)
+            C_RESET="\033[0m"
+
+            # Useable Foreground colours, for black/white white/black
+            C_RED="\033[0;31m"     C_GREEN="\033[0;32m"
+            C_BLUE="\033[0;34m"    C_MAGENTA="\033[0;35m"
+            C_CYAN="\033[0;36m"
+
+            C_BR_RED="\033[0;91m"
+            C_BOLD="\033[1m"
+            C_FAINT="\033[2m"
+
+            C_RESET_BOLD="${C_RESET}${C_BOLD}"
+            trap 'printf "${C_RESET}"' TERM EXIT
+         ;;
+      esac
+   fi
+
+   C_ERROR="${C_RED}${C_BOLD}"
+   C_WARNING="${C_RED}${C_BOLD}"
+   C_INFO="${C_MAGENTA}${C_BOLD}"
+   C_FLUFF="${C_GREEN}${C_BOLD}"
+   C_VERBOSE="${C_CYAN}${C_BOLD}"
+}
+
+
+concat()
+{
+   for i in "$@"
+   do
+      if [ -z "${i}" ]
+      then
+         continue
+      fi
+
+      if [ -z "${s}" ]
+      then
+         s="${i}"
+      else
+         s="${s} ${i}"
+      fi
+   done
+
+   echo "${s}"
+}
+
+
+log_error()
+{
+   printf "${C_ERROR}%b${C_RESET}\n" "$*" >&2
+}
+
+
+log_warning()
+{
+   printf "${C_WARNING}%b${C_RESET}\n" "$*" >&2
+}
+
+
+log_info()
+{
+   printf "${C_INFO}%b${C_RESET}\n" "$*" >&2
+}
+
+
+log_fluff()
+{
+   if [ ! -z "${FLUFF}" ]
+   then
+      printf "${C_FLUFF}%b${C_RESET}\n" "$*" >&2
+   fi
+}
+
+
+log_verbose()
+{
+   if [ ! -z "${VERBOSE}" -a -z "${TERSE}" ]
+   then
+      printf "${C_VERBOSE}%b${C_RESET}\n" "$*" >&2
+   fi
+}
+
+
+fail()
+{
+   log_error "$@"
+   exit 1
+}
+
+
+internal_fail()
+{
+   fail "$@"
+}
+
+
+tar_fail()
+{
+   case "${MULLE_UNAME}" in
+      mingw*)
+         log_warning "$@" "ignored, because we're on MinGW and crossing fingers, that just tests are affected"
+      ;;
+
+      *)
+         fail "$@"
+      ;;
+   esac
+}
+
+
+exekutor_trace()
+{
+   if [ "${MULLE_FLAG_EXECUTOR_DRY_RUN}" = "YES" -o "${MULLE_FLAG_LOG_EXECUTOR}" = "YES" ]
+   then
+      local arrow
+
+      [ -z "${MULLE_EXECUTABLE_PID}" ] && internal_fail "MULLE_EXECUTABLE_PID not set"
+
+      if [ "${PPID}" -ne "${MULLE_EXECUTABLE_PID}" ]
+      then
+         arrow="=[${PPID}]=>"
+      else
+         arrow="==>"
+      fi
+
+      if [ -z "${MULLE_EXECUTOR_LOG_DEVICE}" ]
+      then
+         echo "${arrow}" "$@" >&2
+      else
+         echo "${arrow}" "$@" > "${MULLE_EXECUTOR_LOG_DEVICE}"
+      fi
+   fi
+}
+
+
+exekutor()
+{
+   exekutor_trace "$@"
+
+   if [ "${MULLE_FLAG_EXECUTOR_DRY_RUN}" != "YES" ]
+   then
+      "$@"
+   fi
+}
+
+
+eval_exekutor()
+{
+   exekutor_trace "$@"
+
+   if [ "${MULLE_FLAG_EXECUTOR_DRY_RUN}" != "YES" ]
+   then
+      eval "$@"
+   fi
+}
+
+
+is_root()
+{
+   if [ "$EUID" != "" ]
+   then
+      [ "$EUID" -eq 0 ]
+   else
+      [ "`id -u`" -eq 0 ]
+   fi
+}
+
+
+sudo_if_needed()
+{
+   if [ -z "${SUDO}" ] || is_root
+   then
+      eval exekutor "$@"
+   else
+      command -v "${SUDO}" > /dev/null 2>&1
+      if [ $? -ne 0 ]
+      then
+         fail "Install ${SUDO} or run as root"
+      fi
+      eval exekutor ${SUDO} "$@"
+   fi
+}
+
+
+fetch_brew()
+{
+   case "${MULLE_UNAME}" in
+      darwin)
+         log_fluff "Installing OS X brew"
+
+         exekutor ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" || fail "ruby"
+      ;;
+
+      linux)
+         install_binary_if_missing "curl"
+         install_binary_if_missing "python-setuptools"
+         install_binary_if_missing "build-essential"
+         install_binary_if_missing "ruby"
+
+         log_fluff "Installing Linux brew"
+         exekutor ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/linuxbrew/go/install)" || fail "ruby"
+      ;;
+   esac
+}
+
+
+install_with_brew()
+{
+   PATH="$PATH:/usr/local/bin" command -v "brew" > /dev/null 2>&1
+   if [ $? -ne 0 ]
+   then
+      command -v "ruby" > /dev/null 2>&1
+      if [ $? -ne 0 ]
+      then
+         fail "You need to install $1 manually from $2"
+      fi
+
+      fetch_brew
+   fi
+
+   log_info "Download $1 using brew"
+   PATH="$PATH:/usr/local/bin" exekutor brew install "$1" || exit 1
+}
+
+
+install_library_if_missing()
+{
+   # we just install if there is no sudo needed
+   case "${MULLE_UNAME}" in
+      darwin)
+         install_with_brew "$@" || exit 1
+      ;;
+
+      linux)
+#         if command -v "brew" > /dev/null 2>&1
+#         then
+#            install_with_brew "$@" || exit 1
+#         else
+            if command -v "apt-get" > /dev/null 2>&1
+            then
+               if ! dpkg -s "$1" > /dev/null 2>&1
+               then
+                  log_info "You may get asked for your password to install $1"
+                  sudo_if_needed apt-get install "$1" || exit 1
+               fi
+            else
+               if command -v "yum" > /dev/null 2>&1
+               then
+                  if ! yum list installed "$1" > /dev/null 2>&1
+                  then
+                     log_info "You may get asked for your password to install $1"
+                     sudo_if_needed yum install "$1" || exit 1
+                  fi
+               else
+                  log_warning "You may need to install $1 manually from $2"
+               fi
+            fi
+#        fi
+      ;;
+
+      FreeBSD)
+         if command -v "pkg" > /dev/null 2>&1
+         then
+            if ! pkg info"$1" > /dev/null 2>&1
+            then
+               log_info "You may get asked for your password to install $1"
+               sudo_if_needed pkg install "$1" || exit 1
+            fi
+         else
+            if command -v "pkg_add" > /dev/null 2>&1
+            then
+               if ! pkg_info "$1" > /dev/null 2>&1
+               then
+                  log_info "You may get asked for your password to install $1"
+                  sudo_if_needed pkg_add -r "$1" || exit 1
+               fi
+            else
+               fail "You need to install $1 manually from $2"
+            fi
+         fi
+      ;;
+
+      *)
+         fail "You need to install $1 manually from $2"
+      ;;
+   esac
+}
+
+#
+# third parameter is hackish apt-get install <name>
+# hacked for ninja, should do this properly though
+#
+install_binary_if_missing()
+{
+   if command -v "$1" > /dev/null 2>&1
+   then
+      return
+   fi
+
+   case "${MULLE_UNAME}" in
+      darwin)
+         install_with_brew "$@" || exit 1
+      ;;
+
+      linux)
+#         if command -v "brew" > /dev/null 2>&1
+#         then
+#            install_with_brew "$@" || exit 1
+#         else
+            if command -v "apt-get" > /dev/null 2>&1
+            then
+               log_info "You may get asked for your password to install $1"
+               sudo_if_needed apt-get install "${3:-$1}" || exit 1
+            else
+               if command -v "yum" > /dev/null 2>&1
+               then
+                  log_info "You may get asked for your password to install $1"
+                  sudo_if_needed yum install "$1" || exit 1
+               else
+                  fail "You need to install $1 manually from $2"
+               fi
+            fi
+#         fi
+      ;;
+
+      FreeBSD)
+         if command -v "pkg" > /dev/null 2>&1
+         then
+            log_info "You may get asked for your password to install $1"
+            sudo_if_needed pkg install "$1" || exit 1
+         else
+            if command -v "pkg_add" > /dev/null 2>&1
+            then
+               log_info "You may get asked for your password to install $1"
+               sudo_if_needed pkg_add -r "$1" || exit 1
+            else
+               fail "You need to install $1 manually from $2"
+            fi
+         fi
+      ;;
+
+      *)
+         fail "You need to install $1 manually from $2"
+      ;;
+   esac
+}
+
+
+build_cmake()
+{
+   log_fluff "Build cmake..."
+
+   install_binary_if_missing "curl" "https://curl.haxx.se/"
+   install_binary_if_missing "${CXX_COMPILER}" "https://gcc.gnu.org/install/download.html"
+   install_binary_if_missing "tar" "from somewhere"
+   install_binary_if_missing "make" "from somewhere"
+
+   exekutor mkdir "${SRC_DIR}" 2> /dev/null
+   set -e
+      exekutor cd "${SRC_DIR}"
+
+         if [ -d "cmake-${CMAKE_PATCH_VERSION}" ]
+         then
+            exekutor rm -rf "cmake-${CMAKE_PATCH_VERSION}"
+         fi
+         if [ ! -f "cmake-${CMAKE_PATCH_VERSION}.tar.gz" ]
+         then
+            exekutor curl -k -L -O "https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_PATCH_VERSION}.tar.gz"
+         fi
+
+         exekutor tar xfz "cmake-${CMAKE_PATCH_VERSION}.tar.gz"
+         exekutor cd "cmake-${CMAKE_PATCH_VERSION}"
+         exekutor ./configure "--prefix=${PREFIX}"
+         # don't use ninja here
+         exekutor make -B -j `get_core_count` install || exit 1
+
+         hash -r  # apparently needed...
+      exekutor cd "${OWD}"
+   set +e
+}
+
+
+check_cmake_version()
+{
+#   local major
+#   local minor
+#   local version
+
+   version="`cmake${BUILD_EXE_EXTENSION} -version 2> /dev/null | awk '{ print $3 }'`"
+   if [ -z "${version}" ]
+   then
+      log_fluff "The cmake is not installed."
+      return 2
+   fi
+
+   major="`echo "${version}" | head -1 | cut -d. -f1`"
+   if [ -z "${major}" ]
+   then
+      fail "Could not figure out where cmake is and what version it is."
+   fi
+
+   minor="`echo "${version}" | head -1 | cut -d. -f2`"
+   if [ "${major}" -lt "${CMAKE_VERSION_MAJOR}" ] || [ "${major}" -eq "${CMAKE_VERSION_MAJOR}" -a "${minor}" -lt "${CMAKE_VERSION_MINOR}" ]
+   then
+      return 1
+   fi
+
+   return 0
+}
+
+
+check_and_build_cmake()
+{
+   if [ -z "${BUILD_CMAKE}" ]
+   then
+      install_binary_if_missing "cmake${BUILD_EXE_EXTENSION}" "https://cmake.org/download/"
+   fi
+
+   check_cmake_version
+   case $? in
+      0)
+         return
+      ;;
+
+      1)
+         log_fluff "The cmake version is too old. cmake version ${CMAKE_VERSION} or better is required."
+      ;;
+
+      2)
+         :
+      ;;
+   esac
+
+   log_fluff "Let's build cmake from scratch"
+   build_cmake || fail "build_cmake failed"
+}
+
+
+get_core_count()
+{
+#   local count
+
+   command -v "nproc" > /dev/null 2>&1
+   if [ $? -ne 0 ]
+   then
+      command -v "sysctl" > /dev/null 2>&1
+      if [ $? -ne 0 ]
+      then
+         log_fluff "can't figure out core count, assume 4"
+      else
+         count="`sysctl -n hw.ncpu`"
+      fi
+   else
+      count="`nproc`"
+   fi
+
+   if [ -z "$count" ]
+   then
+      count=4
+   fi
+   echo $count
+}
+
+
+
+
+#
+# Setup environment
+#
+setup_build_environment()
+{
+   if [ "${OPTION_PYTHON}" = 'YES' ]
+   then
+      install_binary_if_missing "python${BUILD_EXE_EXTENSION}" "https://www.python.org/downloads/release"
+   fi
+
+   #
+   # Ninja is probably preferable if installed
+   # Should configure this though somewhere
+   # Unfortunately on mingw, compile errors in libcxx
+   # as ninja picks up the wrong c.
+   #
+   if [ "${OPTION_NINJA}" = "YES" ]
+   then
+      install_binary_if_missing "ninja${BUILD_EXE_EXTENSION}" "https://github.com/ninja-build/ninja/releases" "ninja-build"
+
+      MAKE="ninja${BUILD_EXE_EXTENSION}"
+
+      if [ "${OPTION_PARALLEL}" = "NO" ]
+      then
+         MAKE_FLAGS="-j 1"
+      else
+#         local cores
+#         local loadavg
+
+         cores="`get_core_count`"
+         loadavg="`expr $cores / 4`"
+         loadavg="`expr $cores - ${loadavg}`"
+         if [ "${loadavg}" -gt 0 ]
+         then
+            MAKE_FLAGS="-l ${loadavg}"
+         fi
+      fi
+      if [ "${VERBOSE}" = "YES" ]
+      then
+         MAKE_FLAGS="-v ${MAKE_FLAGS}"
+      fi
+   fi
+
+   #
+   # make sure cmake and git and gcc are present (and in the path)
+   # should check version
+   # Set some defaults so stuff possibly just magically works.
+   #
+   case "${MULLE_UNAME}" in
+      mingw*)
+         log_fluff "Detected MinGW on Windows"
+         PATH="$PATH:/c/Program Files/CMake/bin/cmake:/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin"
+
+         install_binary_if_missing "xz" "https://tukaani.org/xz and then add the directory containing xz to your %PATH%"
+
+         if [ "${OPTION_VS32BIT}" = "YES" ]
+         then
+            # can't use ninja then though
+            CMAKE_FLAGS="${CMAKE_FLAGS} -Thost=x64"
+            if [ ! -z "${MAKE}" ]
+            then
+               log_verbose "Falling back to msbuild, as you can't use -Thost=x64 with ${MAKE}...
+  But then may run into problems later with visual studio (maybe)."
+               MAKE=
+            fi
+         fi
+
+         if [ -z "${MAKE}" ]
+         then
+            install_binary_if_missing "msbuild.exe" "https://www.visualstudio.com/de-de/downloads/download-visual-studio-vs.aspx and then add the directory containing nmake to your %PATH%"
+
+            MAKE="msbuild.exe"
+
+         fi
+
+         CXX_COMPILER=cl.exe
+         C_COMPILER=cl.exe
+      ;;
+
+      #
+      # FreeBSD needs rpath set for c++ libraries
+      #
+      FreeBSD)
+         CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,\\\$ORIGIN/../lib"
+      ;;
+   esac
+
+   if [ -z "${MAKE}" ]
+   then
+      install_binary_if_missing "make${BUILD_EXE_EXTENSION}" "somewhere"
+
+      MAKE="make${BUILD_EXE_EXTENSION}"
+      if [ "${OPTION_PARALLEL}" = "NO" ]
+      then
+         MAKE_FLAGS="-B -j `get_core_count`"
+      else
+         MAKE_FLAGS="-B"
+      fi
+   fi
+
+   check_and_build_cmake
+
+   if [ "${C_COMPILER}" = "gcc${BUILD_EXE_EXTENSION}" ]
+   then
+      install_binary_if_missing "gcc${BUILD_EXE_EXTENSION}" "https://gcc.gnu.org/install/download.html"
+   else
+      if [ "${C_COMPILER}" = "clang${BUILD_EXE_EXTENSION}" ]
+      then
+         install_binary_if_missing "clang${BUILD_EXE_EXTENSION}" "https://clang.llvm.org/get_started.html"
+      else
+         install_binary_if_missing "${C_COMPILER}" "somewhere (c compiler)"
+      fi
+   fi
+
+   if [ "${CXX_COMPILER}" = "g++${BUILD_EXE_EXTENSION}" ]
+   then
+      install_binary_if_missing "g++${BUILD_EXE_EXTENSION}" "https://gcc.gnu.org/install/download.html" "build-essential"
+   else
+      if [ "${CXX_COMPILER}" = "clang++${BUILD_EXE_EXTENSION}" ]
+      then
+         install_binary_if_missing "clang++${BUILD_EXE_EXTENSION}" "https://clang.llvm.org/get_started.html" "clang"
+      else
+         install_binary_if_missing "${CXX_COMPILER}" "somewhere (cpp compiler)"
+      fi
+   fi
+
+   case "${MULLE_UNAME}" in
+      darwin)
+      ;;
+
+      linux)
+         install_binary_if_missing "valgrind" "https://???"
+#         install_library_if_missing "python-dev" "https://www.python.org/downloads/release"
+         install_library_if_missing "python3-distutils" "https://docs.python.org/3/library/distutils.html"
+         install_library_if_missing "libxml2-dev" "https://xmlsoft.org"
+         install_library_if_missing "libz-dev" "https://???"
+         install_library_if_missing "libtinfo-dev" "https://???"
+      ;;
+
+      *)
+      ;;
+   esac
+
+
+   if [ "${BUILD_LLDB}" = "YES" ]
+   then
+      install_binary_if_missing "swig${BUILD_EXE_EXTENSION}" "https://swig.org/download.html"
+
+      case "${MULLE_UNAME}" in
+         darwin)
+         ;;
+
+         linux)
+            # memo: python3-distutils is needed nowadays to avoid ModuleNotFoundError: No module named 'distutils.spawn'
+            install_library_if_missing "python-dev" "https://www.python.org/downloads/release"
+            install_library_if_missing "libncurses5-dev" "https://www.gnu.org/software/ncurses"
+            install_library_if_missing "libedit-dev" "https://thrysoee.dk/editline"
+         ;;
+
+         *)
+         ;;
+      esac
+   fi
+}
+
+
+
+main()
+{
+   PREFIX="DEFAULT"
+
+   OWD="`pwd -P`"
+
+   BUILD_CLANG="${BUILD_CLANG:-YES}"
+   BUILD_LLVM="${BUILD_LLVM:-YES}"
+   BUILD_LLDB="${BUILD_LLDB:-NO}"
+   BUILD_RT="${BUILD_RT:-YES}"
+
+   INSTALL_LLVM="${INSTALL_LLVM:-YES}"
+   OPTION_NINJA="YES"
+   OPTION_PATCH_LLVM="YES"
+   OPTION_WARN="YES"
+   OPTION_VS32BIT="NO"
+   OPTION_LINKER="${LD:-DEFAULT}"
+   RUN_LLVM_CMAKE="DEFAULT"
+   TARGET_ARCH=
+   OPTION_TARGETS='DEFAULT'
+   OPTION_PARALLEL='DEFAULT'
+   ENABLE_PYTHON='DEFAULT'
+
+   while [ $# -ne 0 ]
+   do
+      case "$1" in
+         -h|--help|help)
+            usage
+         ;;
+
+         -t|--trace)
+            set -x
+         ;;
+
+         -f)
+            RUN_LLVM_CMAKE="YES"
+         ;;
+
+         -n)
+            MULLE_FLAG_EXECUTOR_DRY_RUN="YES"
+         ;;
+
+         -lx|-V)
+            MULLE_FLAG_LOG_EXECUTOR="YES"
+         ;;
+
+         -v|--verbose)
+            FLUFF=
+            VERBOSE="YES"
+         ;;
+
+         -vv|-vvv|--very-verbose)
+            FLUFF="YES"
+            VERBOSE="YES"
+            MULLE_FLAG_LOG_EXECUTOR="YES"
+         ;;
+
+         --build-cmake)
+            BUILD_CMAKE="YES"
+         ;;
+
+         --python)
+            ENABLE_PYTHON="YES"
+         ;;
+
+         --no-python)
+            ENABLE_PYTHON="NO"
+         ;;
+
+         --linker)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_LINKER="$1"
+         ;;
+
+         # can be useful when migrating to new llvm version
+         --with-lldb|--build-lldb)
+            BUILD_LLDB="YES"
+         ;;
+
+         --no-lldb)
+            BUILD_LLDB="NO"
+         ;;
+
+         --vs32bit)
+            OPTION_VS32BIT="YES"
+         ;;
+
+         --prefix)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            PREFIX="$1"
+         ;;
+
+         --targets)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            OPTION_TARGETS="$1"
+         ;;
+
+         --target-arch)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            TARGET_ARCH="$1"
+         ;;
+
+         --no-parallel)
+            OPTION_PARALLEL="NO"
+         ;;
+
+         --no-ninja)
+            OPTION_NINJA="NO"
+         ;;
+
+         --no-warn)
+            OPTION_WARN="NO"
+         ;;
+
+         --wsl)
+            MULLE_UNAME="windows"
+            EXE_EXTENSION=".exe"
+            BUILD_EXE_EXTENSION=".exe"
+         ;;
+
+         -*)
+            echo "unknown option $1" >&2
+            exit 1
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   COMMAND="${1:-default}"
+   [ $# -eq 0 ] || shift
+
+   #
+   # it makes little sense to change these
+   #
+   SRC_DIR="src"
+   BUILD_DIR="build"
+   BUILD_RELATIVE=".."
+
+   # different builds for OS Versions on OS X
+   case "${MULLE_UNAME}" in
+      darwin)
+         osxversion="`sw_vers -productVersion | cut -d. -f 1-2`"
+         BUILD_DIR="build-${osxversion}"
+         if [ "${PREFIX}" = "DEFAULT" ]
+         then
+            PREFIX="${OWD}/${osxversion}"
+         fi
+         if [ "${ENABLE_PYTHON}" = "DEFAULT" ]
+         then
+            ENABLE_PYTHON='NO'
+         fi
+      ;;
+
+      mingw)
+      ;;
+   esac
+
+   if [ "${ENABLE_PYTHON}" = "DEFAULT" ]
+   then
+      ENABLE_PYTHON='YES'  # for vscode plugin
+   fi
+
+   if [ "${PREFIX}" = "DEFAULT" ]
+   then
+      PREFIX="${OWD}"
+   fi
+
+   [ -z "${PREFIX}" ] && fail "PREFIX is empty"
+
+   #
+   # just very experimental and rudimentary for now
+   # We assume that PREFIX is set to an existing clang, and we then
+   # just posfix the architecture onto it
+   case "${TARGET_ARCH}" in
+      "")
+         HOST_PATH="$PATH"
+      ;;
+
+      "ARM"|"AArch64")
+         #
+         # Now with prefix set... get host compiler path first
+         #
+         HOST_PATH="${PREFIX}/bin:$PATH"
+         PREFIX="${PREFIX}.${TARGET_ARCH}"
+         BUILD_DIR="${BUILD_DIR}.${TARGET_ARCH}"
+         if [ "${OPTION_TARGETS}" = "DEFAULT" ]
+         then
+            OPTION_TARGETS="ARM;AArch64"
+         fi
+      ;;
+
+      *)
+         fail "Can only use ARM for now.
+${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
+      ;;
+   esac
+
+   #
+   # modify this so clang build separate picks up llvm_config
+   # the disadvantage here is that on a subsequent run the new
+   # compiler will be picked up, it will be different than the
+   # host compiler and this will force a rebuild (that fails)
+   #
+   PATH="${PREFIX}/bin:${HOST_PATH}"; export PATH
+
+   # shouldn't this be CC /CXX ?
+   C_COMPILER="${CC}"
+   if [ -z "${C_COMPILER}" ]
+   then
+      C_COMPILER="`command -v "clang"`"
+      if [ -z "${C_COMPILER}" ]
+      then
+         C_COMPILER="`command -v "gcc"`"
+         if [ -z "${C_COMPILER}" ]
+         then
+            C_COMPILER="gcc"
+         fi
+      fi
+      C_COMPILER="`basename "${C_COMPILER}"`"
+   fi
+
+   CXX_COMPILER="${CXX}"
+   CXX_COMPILER="${CXX_COMPILER:-${C_COMPILER}++}"
+
+   if [ "${CXX_COMPILER}" = "gcc++" ]
+   then
+      CXX_COMPILER="g++"
+   fi
+
+   #
+   # override for wsl
+   # but this gets ignore eventually anyway
+   #
+   case "${MULLE_UNAME}" in
+      windows)
+         C_COMPILER="cl.exe"
+         CXX_COMPILER="cl.exe"
+      ;;
+   esac
+
+   #
+   # since g++9/clang 9. or so -use-ld is not understood anymore
+   # or passed incorrectly
+   #
+   if [ "${OPTION_LINKER}" = "DEFAULT" ]
+   then
+      unset OPTION_LINKER
+
+      case "${MULLE_UNAME}" in
+         windows)
+            linkerpreferences="link.exe"
+         ;;
+
+         mingw*)
+            # todo: untested
+            linkerpreferences="lld ld.lld ld link.exe"
+         ;;
+
+         *)
+            linkerpreferences="lld ld.lld gold ld.gold ld"
+         ;;
+      esac
+
+      for linker in ${linkerpreferences}
+      do
+	 case "${CXX_COMPILER}" in
+             g++)
+             ;;
+
+             *)
+               if [ ! -z "`command -v "${linker}"`" ]
+               then
+                  OPTION_LINKER="${linker}"
+                  log_verbose "Use linker=${linker}"
+                  break
+               fi
+	    ;;
+	 esac
+      done
+   fi
+
+
+   # override this to use pre-installed llvm
+
+   case "$COMMAND" in
+      default|install)
+         setup_build_environment
+      ;;
+
+      *)
+         fail "Unknown command \"$COMMAND\""
+      ;;
+   esac
+}
+
+MULLE_EXECUTABLE_PID="$$"
+
+environment_initialize
+log_initialize
+main "$@"

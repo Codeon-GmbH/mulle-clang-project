@@ -986,6 +986,32 @@ public:
 
   /// Return the property name for the given setter selector.
   static std::string getPropertyNameFromSetterSelector(Selector Sel);
+
+  // @mulle-objc@ new property attribute container >
+  /// Return the default adder/remover names for the given identifier.
+  ///
+  /// This is "addTo" or "removeFrom" + \p Name where the initial character of \p Name
+  /// has been capitalized.
+  static SmallString<64> constructAdderName(StringRef Name);
+  static SmallString<64> constructRemoverName(StringRef Name);
+
+  /// Return the default setter selector for the given identifier.
+  ///
+  /// This is "set" + \p Name where the initial character of \p Name
+  /// has been capitalized.
+  static Selector constructAdderSelector(IdentifierTable &Idents,
+                                          SelectorTable &SelTable,
+                                          const IdentifierInfo *Name);
+  /// Return the default setter selector for the given identifier.
+  ///
+  /// This is "set" + \p Name where the initial character of \p Name
+  /// has been capitalized.
+  static Selector constructRemoverSelector(IdentifierTable &Idents,
+                                          SelectorTable &SelTable,
+                                          const IdentifierInfo *Name);
+  static std::string getPropertyNameFromAdderSelector(Selector Sel);
+  static std::string getPropertyNameFromRemoverSelector(Selector Sel);
+  // @mulle-objc@ new property attribute container <
 };
 
 namespace detail {

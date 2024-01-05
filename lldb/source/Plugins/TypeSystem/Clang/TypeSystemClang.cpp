@@ -7866,6 +7866,7 @@ bool TypeSystemClang::SetObjCSuperClass(
   return false;
 }
 
+
 bool TypeSystemClang::AddObjCClassProperty(
     const CompilerType &type, const char *property_name,
     const CompilerType &property_clang_type, clang::ObjCIvarDecl *ivar_decl,
@@ -7920,6 +7921,44 @@ bool TypeSystemClang::AddObjCClassProperty(
   class_interface_decl->addDecl(property_decl);
 
   clang::Selector setter_sel, getter_sel;
+  // @mulle-objc@ giant copy/paste for container methods >
+  clang::Selector adder_sel, remover_sel;
+
+  if (property_remover_name) {
+    std::string property_setter_no_colon(property_remover_name,
+                                         strlen(property_remover_name) - 1);
+    clang::IdentifierInfo *remover_ident =
+        &clang_ast.Idents.get(property_remover_no_colon);
+    setter_sel = clang_ast.Selectors.getSelector(1, &remover_ident);
+  } else if (!(property_attributes & DW_APPLE_PROPERTY_readonly)) {
+    std::string remover_sel_string("removeFrom");
+    remover_sel_string.push_back(::toupper(property_name[0]));
+    remover_sel_string.append(&property_name[1]);
+    clang::IdentifierInfo *remover_ident =
+        &clang_ast.Idents.get(remover_sel_string);
+    setter_sel = clang_ast.Selectors.getSelector(1, &remover_ident);
+  }
+  property_decl->setRemoverName(remover_sel);
+  property_decl->setPropertyAttributes(ObjCPropertyAttribute::kind_remover);
+
+  if (property_adder_name) {
+    std::string property_setter_no_colon(property_adder_name,
+                                         strlen(property_adder_name) - 1);
+    clang::IdentifierInfo *adder_ident =
+        &clang_ast.Idents.get(property_adder_no_colon);
+    setter_sel = clang_ast.Selectors.getSelector(1, &adder_ident);
+  } else if (!(property_attributes & DW_APPLE_PROPERTY_readonly)) {
+    std::string adder_sel_string("addTo");
+    adder_sel_string.push_back(::toupper(property_name[0]));
+    adder_sel_string.append(&property_name[1]);
+    clang::IdentifierInfo *adder_ident =
+        &clang_ast.Idents.get(adder_sel_string);
+    setter_sel = clang_ast.Selectors.getSelector(1, &adder_ident);
+  }
+  property_decl->setAdderName(adder_sel);
+  property_decl->setPropertyAttributes(ObjCPropertyAttribute::kind_adder);
+
+  // @mulle-objc@ giant copy/paste for container methods <
 
   if (property_setter_name) {
     std::string property_setter_no_colon(property_setter_name,
@@ -8068,6 +8107,111 @@ bool TypeSystemClang::AddObjCClassProperty(
     setter->setPropertyAccessor(true);
     property_decl->setSetterMethodDecl(setter);
   }
+
+  // @mulle-objc@ giant copy/paste for container methods >
+  clang::ObjCMethodDecl *adder = nullptr;
+    adder = isInstance ? class_interface_decl->lookupInstanceMethod(adder_sel)
+                        : class_interface_decl->lookupClassMethod(adder_sel);
+  if (!adder_sel.isNull() && !adder) {
+    clang::QualType result_type = clang_ast.VoidTy;
+    const bool isVariadic = false;
+    const bool isPropertyAccessor = true;
+    const bool isSynthesizedAccessorStub = false;
+    const bool isImplicitlyDeclared = true;
+    const bool isDefined = false;
+    const clang::ObjCMethodDecl::ImplementationControl impControl =
+        clang::ObjCMethodDecl::None;
+    const bool HasRelatedResultType = false;
+
+    adder = clang::ObjCMethodDecl::CreateDeserialized(clang_ast, 0);
+    adder->setDeclName(adder_sel);
+    adder->setReturnType(result_type);
+    adder->setDeclContext(class_interface_decl);
+    adder->setInstanceMethod(isInstance);
+    adder->setVariadic(isVariadic);
+    adder->setPropertyAccessor(isPropertyAccessor);
+    adder->setSynthesizedAccessorStub(isSynthesizedAccessorStub);
+    adder->setImplicit(isImplicitlyDeclared);
+    adder->setDefined(isDefined);
+    adder->setDeclImplementation(impControl);
+    adder->setRelatedResultType(HasRelatedResultType);
+    SetMemberOwningModule(adder, class_interface_decl);
+
+    if (adder) {
+      if (metadata)
+        ast->SetMetadata(adder, *metadata);
+
+      llvm::SmallVector<clang::ParmVarDecl *, 1> params;
+      params.push_back(clang::ParmVarDecl::Create(
+          clang_ast, adder, clang::SourceLocation(), clang::SourceLocation(),
+          nullptr, // anonymous
+          ClangUtil::GetQualType(property_clang_type_to_access), nullptr,
+          clang::SC_Auto, nullptr));
+
+      adder->setMethodParams(clang_ast,
+                              llvm::ArrayRef<clang::ParmVarDecl *>(params),
+                              llvm::ArrayRef<clang::SourceLocation>());
+
+      class_interface_decl->addDecl(adder);
+    }
+  }
+  if (adder) {
+    adder->setPropertyAccessor(true);
+    property_decl->setAdderMethodDecl(adder);
+  }
+
+
+  clang::ObjCMethodDecl *remover = nullptr;
+    remover = isInstance ? class_interface_decl->lookupInstanceMethod(remover_sel)
+                        : class_interface_decl->lookupClassMethod(remover_sel);
+  if (!remover_sel.isNull() && !remover) {
+    clang::QualType result_type = clang_ast.VoidTy;
+    const bool isVariadic = false;
+    const bool isPropertyAccessor = true;
+    const bool isSynthesizedAccessorStub = false;
+    const bool isImplicitlyDeclared = true;
+    const bool isDefined = false;
+    const clang::ObjCMethodDecl::ImplementationControl impControl =
+        clang::ObjCMethodDecl::None;
+    const bool HasRelatedResultType = false;
+
+    remover = clang::ObjCMethodDecl::CreateDeserialized(clang_ast, 0);
+    remover->setDeclName(remover_sel);
+    remover->setReturnType(result_type);
+    remover->setDeclContext(class_interface_decl);
+    remover->setInstanceMethod(isInstance);
+    remover->setVariadic(isVariadic);
+    remover->setPropertyAccessor(isPropertyAccessor);
+    remover->setSynthesizedAccessorStub(isSynthesizedAccessorStub);
+    remover->setImplicit(isImplicitlyDeclared);
+    remover->setDefined(isDefined);
+    remover->setDeclImplementation(impControl);
+    remover->setRelatedResultType(HasRelatedResultType);
+    SetMemberOwningModule(remover, class_interface_decl);
+
+    if (remover) {
+      if (metadata)
+        ast->SetMetadata(remover, *metadata);
+
+      llvm::SmallVector<clang::ParmVarDecl *, 1> params;
+      params.push_back(clang::ParmVarDecl::Create(
+          clang_ast, remover, clang::SourceLocation(), clang::SourceLocation(),
+          nullptr, // anonymous
+          ClangUtil::GetQualType(property_clang_type_to_access), nullptr,
+          clang::SC_Auto, nullptr));
+
+      remover->setMethodParams(clang_ast,
+                              llvm::ArrayRef<clang::ParmVarDecl *>(params),
+                              llvm::ArrayRef<clang::SourceLocation>());
+
+      class_interface_decl->addDecl(remover);
+    }
+  }
+  if (remover) {
+    remover->setPropertyAccessor(true);
+    property_decl->setRemoverMethodDecl(remover);
+  }
+  // @mulle-objc@ giant copy/paste for container methods <
 
   return true;
 }

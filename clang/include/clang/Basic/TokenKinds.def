@@ -462,6 +462,15 @@ KEYWORD(__FUNCTION__                , KEYALL)
 KEYWORD(__PRETTY_FUNCTION__         , KEYALL)
 KEYWORD(__auto_type                 , KEYALL)
 
+// @mulle-objc@ > add __OBJC_CLASS__ keyword
+// Mulle Extensions it's KEYALL coz I am too lazy to research how to turn
+// on KEYMULLE by default
+KEYWORD(__OBJC_CLASS__              , KEYALL)
+KEYWORD(__OBJC_CATEGORY__           , KEYALL)
+KEYWORD(__MULLE_OBJC_CLASSID__      , KEYALL)
+KEYWORD(__MULLE_OBJC_CATEGORYID__   , KEYALL)
+// @mulle-objc@ < add __OBJC_CLASS__ keyword
+
 // MS Extensions
 KEYWORD(__FUNCDNAME__               , KEYMS)
 KEYWORD(__FUNCSIG__                 , KEYMS)

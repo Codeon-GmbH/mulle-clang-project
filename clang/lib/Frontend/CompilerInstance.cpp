@@ -1136,8 +1136,10 @@ static Language getLanguageFromOptions(const LangOptions &LangOpts) {
     return Language::OpenCL;
   if (LangOpts.CUDA)
     return Language::CUDA;
+  // @mulle-objc@ patch language selection >
   if (LangOpts.ObjC)
-    return LangOpts.CPlusPlus ? Language::ObjCXX : Language::ObjC;
+    return LangOpts.CPlusPlus ? Language::ObjCXX :  (LangOpts.ObjCAllocsAutoreleasedObjects ? Language::ObjCAAM : Language::ObjC);
+  // @mulle-objc@ patch language selection <
   return LangOpts.CPlusPlus ? Language::CXX : Language::C;
 }
 

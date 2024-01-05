@@ -33,6 +33,9 @@ namespace llvm {
 }
 
 namespace clang {
+// @mulle-objc@ add Parse class into namespace (still needed ?) >
+  class Parser;
+// @mulle-objc@ add Parse class into namespace (still needed ?) <
 namespace CodeGen {
 class CGFunctionInfo;
 class CodeGenFunction;
@@ -57,6 +60,14 @@ class CodeGenFunction;
 namespace CodeGen {
   class CodeGenModule;
   class CGBlockInfo;
+
+// @mulle-objc@ >
+struct CGObjCRuntimeLifetimeMarker
+{
+   llvm::Value  *SizeV;
+   llvm::Value  *Addr;
+};
+// @mulle-objc@ <
 
 // FIXME: Several methods should be pure virtual but aren't to avoid the
 // partially-implemented subclass breaking.
@@ -150,12 +161,23 @@ public:
   /// Generate a constant string object.
   virtual ConstantAddress GenerateConstantString(const StringLiteral *) = 0;
 
+   // @mulle-objc@: emit constant selectors
+   /// Generate a constant selector for participating runtimes
+  virtual llvm::Constant  *GenerateConstantSelector(Selector);
+  virtual llvm::Constant  *GenerateConstantProtocol(ObjCProtocolDecl *protocol);
+   // @mulle-objc@: emit constant selectors <-
+
   /// Generate a category.  A category contains a list of methods (and
   /// accompanying metadata) and a list of protocols.
   virtual void GenerateCategory(const ObjCCategoryImplDecl *OCD) = 0;
 
   /// Generate a class structure for this class.
   virtual void GenerateClass(const ObjCImplementationDecl *OID) = 0;
+
+  /// @mulle-objc@: forward declarations to runtime
+  /// Generate a  forward class for this class.
+  virtual void GenerateForwardClass(const ObjCInterfaceDecl *OID);
+  /// @mulle-objc@: forward declarations to runtime end
 
   /// Register an class alias.
   virtual void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) = 0;
@@ -188,6 +210,32 @@ public:
                                          const ObjCInterfaceDecl *OID,
                                          const ObjCMethodDecl *Method,
                                          bool isClassMessage);
+   // @mulle-objc@ MetaABI: Callback to generate LLVM method argument list
+   virtual CGObjCRuntimeLifetimeMarker   GenerateCallArgs( CodeGenFunction &CGF,
+                                                           CallArgList &Args,
+                                                           const ObjCMethodDecl *method,
+                                                           const ObjCMessageExpr *Expr);
+
+   virtual CGObjCRuntimeLifetimeMarker   ConvertToMetaABIArgsIfNeeded( CodeGenFunction &CGF,
+                                                                       const ObjCMethodDecl *method,
+                                                                       CallArgList &Args);
+
+  /// @mulle-objc@ MetaABI: callback in special cases to create param decl
+   virtual CodeGen::RValue  EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                                    ReturnValueSlot ReturnSlot,
+                                                    QualType ResultType,
+                                                    Selector Sel,
+                                                    llvm::Value *Receiver,
+                                                    llvm::Value *StatePtr,
+                                                    QualType StateTy,
+                                                    llvm::Value *ItemsPtr,
+                                                    QualType ItemsTy,
+                                                    llvm::Value *Count,
+                                                    QualType CountTy);
+
+  /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+  virtual void      ParserDidFinish( clang::Parser *P) {};
+
 
   /// Generate an Objective-C message send operation to the super
   /// class initiated in a method for Class and with the given Self
@@ -252,6 +300,21 @@ public:
   /// Return the runtime function for setting properties.
   virtual llvm::FunctionCallee GetPropertySetFunction() = 0;
 
+  // @mulle-objc@ new property attributes container, observable, relationship >
+  /// Return the runtime function for adding to container properties.
+  virtual llvm::FunctionCallee GetPropertyContainerAddFunction();
+
+  /// Return the runtime function for removing from container properties.
+  virtual llvm::FunctionCallee GetPropertyContainerRemoveFunction();
+
+  /// Return the runtime function for announcing changes.
+  virtual llvm::FunctionCallee GetWillChangeFunction();
+
+  /// Return the runtime function for announcing changes.
+  virtual llvm::FunctionCallee GetWillReadRelationshipFunction();
+
+  // @mulle-objc@ new property attributes container, observable, relationship <
+
   /// Return the runtime function for optimized setting properties.
   virtual llvm::FunctionCallee GetOptimizedPropertySetFunction(bool atomic,
                                                                bool copy) = 0;
@@ -271,6 +334,9 @@ public:
   /// interface decl.
   virtual llvm::Value *GetClass(CodeGenFunction &CGF,
                                 const ObjCInterfaceDecl *OID) = 0;
+  virtual llvm::Value *GetClass(CodeGenFunction &CGF,
+                                const ObjCInterfaceDecl *OID,
+                                llvm::Value *self) = 0;
 
 
   virtual llvm::Value *EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) {
@@ -335,9 +401,12 @@ public:
       : CallInfo(callInfo), MessengerType(messengerType) {}
   };
 
+  // @mulle-obj@ add isSuper to getMessageSendInfo >
   MessageSendInfo getMessageSendInfo(const ObjCMethodDecl *method,
                                      QualType resultType,
-                                     CallArgList &callArgs);
+                                     CallArgList &callArgs,
+                                     bool isSuper = false);
+  // @mulle-obj@ add isSuper to getMessageSendInfo <
   bool canMessageReceiverBeNull(CodeGenFunction &CGF,
                                 const ObjCMethodDecl *method,
                                 bool isSuper,
@@ -367,6 +436,9 @@ public:
 //TODO: This should include some way of selecting which runtime to target.
 CGObjCRuntime *CreateGNUObjCRuntime(CodeGenModule &CGM);
 CGObjCRuntime *CreateMacObjCRuntime(CodeGenModule &CGM);
+// @mulle-obj@ add CreateMulleObjCRuntime >
+CGObjCRuntime *CreateMulleObjCRuntime(CodeGenModule &CGM);
+// @mulle-obj@ add CreateMulleObjCRuntime <
 }
 }
 #endif

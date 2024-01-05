@@ -68,6 +68,9 @@ static CXTypeKind GetBuiltinTypeKind(const BuiltinType *BT) {
     BTCASE(ObjCId);
     BTCASE(ObjCClass);
     BTCASE(ObjCSel);
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    BTCASE(ObjCProtocol);
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) BTCASE(Id);
 #include "clang/Basic/OpenCLImageTypes.def"
 #undef IMAGE_TYPE
@@ -156,6 +159,10 @@ CXType cxtype::MakeCXType(QualType T, CXTranslationUnit TU) {
         TK = CXType_ObjCClass;
       else if (Ctx.isObjCSelType(UnqualT))
         TK = CXType_ObjCSel;
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+      else if (Ctx.isObjCProtocolType(UnqualT))
+         TK = CXType_ObjCProtocol;
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
     }
 
     /* Handle decayed types as the original type */
@@ -592,6 +599,9 @@ CXString clang_getTypeKindSpelling(enum CXTypeKind K) {
     TKIND(ObjCId);
     TKIND(ObjCClass);
     TKIND(ObjCSel);
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    TKIND(ObjCProtocol);
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
     TKIND(Complex);
     TKIND(Pointer);
     TKIND(BlockPointer);

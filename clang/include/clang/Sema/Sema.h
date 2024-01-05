@@ -4861,6 +4861,12 @@ public:
                       SourceLocation GetterNameLoc,
                       Selector SetterSel,
                       SourceLocation SetterNameLoc,
+// @mulle-objc@ new property accessors >
+                      Selector AdderSel,
+                      SourceLocation AdderNameLoc,
+                      Selector RemoverSel,
+                      SourceLocation RemoverNameLoc,
+// @mulle-objc@ new property accessors <
                       const bool isReadWrite,
                       unsigned &Attributes,
                       const unsigned AttributesAsWritten,
@@ -4879,6 +4885,12 @@ public:
                                        SourceLocation GetterNameLoc,
                                        Selector SetterSel,
                                        SourceLocation SetterNameLoc,
+// @mulle-objc@ new property accessors >
+                                       Selector AdderSel,
+                                       SourceLocation AdderNameLoc,
+                                       Selector RemoverSel,
+                                       SourceLocation RemoverNameLoc,
+// @mulle-objc@ new property accessors <
                                        const bool isReadWrite,
                                        const unsigned Attributes,
                                        const unsigned AttributesAsWritten,
@@ -5622,6 +5634,13 @@ public:
   ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S,
                                 IdentifierInfo *II,
                                 bool AllowBuiltinCreation=false);
+
+  // @mulle-objc@ MetaABI: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr >
+  ExprResult   GetMulle_paramExpr( Scope *S, SourceLocation Loc, StringRef Name);
+  ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, SourceLocation Loc);
+  ExprResult   GetMulle_paramExprAsType( QualType type, Scope *S, SourceLocation Loc, StringRef Name);
+  // @mulle-objc@ MetaABI: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr <
+
 
   ExprResult ActOnDependentIdExpression(const CXXScopeSpec &SS,
                                         SourceLocation TemplateKWLoc,
@@ -10476,6 +10495,17 @@ public:
   /// \param property The property declaration being processed
   void ProcessPropertyDecl(ObjCPropertyDecl *property);
 
+// @mulle-objc@ new property attribute container >
+  void VerifyPropertyNonGetterMethod( ObjCPropertyDecl *property,
+                                      ObjCMethodDecl *method,
+                                      std::string name);
+
+  ObjCMethodDecl  *CreatePropertyNonGetterMethod( ObjCContainerDecl *CD,
+                                                  ObjCPropertyDecl *property,
+                                                  Selector Selector,
+                                                  bool isSetter = true);
+// @mulle-objc@ new property attribute container <
+
 
   void DiagnosePropertyMismatch(ObjCPropertyDecl *Property,
                                 ObjCPropertyDecl *SuperProperty,
@@ -10493,6 +10523,9 @@ public:
                       SourceLocation LParenLoc,
                       FieldDeclarator &FD, ObjCDeclSpec &ODS,
                       Selector GetterSel, Selector SetterSel,
+// @mulle-objc@ new property attribute container >
+                      Selector AdderSel, Selector RemoverSel,
+// @mulle-objc@ new property attribute container <
                       tok::ObjCKeywordKind MethodImplKind,
                       DeclContext *lexicalDC = nullptr);
 
@@ -10538,6 +10571,29 @@ public:
       unsigned CNumArgs, // c-style args
       const ParsedAttributesView &AttrList, tok::ObjCKeywordKind MethodImplKind,
       bool isVariadic, bool MethodDefinition);
+
+  // @mulle-objc@ MetaABI: additional method SetMulleObjCParam >
+  // Why do I have to specify the size of the vector when passing ??
+  void   SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
+                            Selector Sel,
+                            SmallVector<ParmVarDecl*, 16> *Params,
+                            QualType resultType,
+                            unsigned int abiDesc,
+                            SourceLocation   Loc);
+  bool  isMetaABIAllocaMethod( ObjCMethodDecl *ObjCMethod,
+                                          QualType resultType);
+
+  enum MetaABIDescription
+  {
+    MetaABIVoidPtrRval   = 0x0,
+    MetaABIVoidPtrParam  = 0x1,
+    MetaABIRvalAsStruct  = 0x2,
+    MetaABIParamAsStruct = 0x4
+  };
+
+  unsigned int    metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
+                                     QualType resultType);
+  // @mulle-objc@ MetaABI: additional method SetMulleObjCParam <
 
   ObjCMethodDecl *LookupMethodInQualifiedType(Selector Sel,
                                               const ObjCObjectPointerType *OPT,
@@ -10636,6 +10692,20 @@ public:
                                           Selector Sel,
                                           ObjCMethodDecl *Method,
                                           MultiExprArg Args);
+
+  // @mulle-objc@ compiler: additional method CheckMulleObjCFunctionDefined >
+  bool  CheckMulleObjCFunctionDefined( Scope *S,
+                                       SourceLocation Loc,
+                                       StringRef Name);
+  // @mulle-objc@ compiler: additional method CheckMulleObjCFunctionDefined <
+
+  // @mulle-objc@ AAM:  check that selectors conform >
+  int   CheckSelectorForAAM( Selector Sel,
+                             ObjCMethodDecl *Method,
+                             QualType ReceiverType,
+                             SourceLocation SelLoc,
+                             SourceRange RecRange);
+  // @mulle-objc@ AAM:  check that selectors conform <
 
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,
@@ -13470,6 +13540,10 @@ public:
   void CodeCompleteObjCPropertyFlags(Scope *S, ObjCDeclSpec &ODS);
   void CodeCompleteObjCPropertyGetter(Scope *S);
   void CodeCompleteObjCPropertySetter(Scope *S);
+  // @mulle-objc@ new property attributes container >
+  void CodeCompleteObjCPropertyAdder(Scope *S);
+  void CodeCompleteObjCPropertyRemover(Scope *S);
+  // @mulle-objc@ new property attributes container <
   void CodeCompleteObjCPassingType(Scope *S, ObjCDeclSpec &DS,
                                    bool IsParameter);
   void CodeCompleteObjCMessageReceiver(Scope *S);

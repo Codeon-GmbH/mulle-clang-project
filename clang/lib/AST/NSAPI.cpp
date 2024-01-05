@@ -462,6 +462,9 @@ NSAPI::getNSNumberFactoryMethodKind(QualType T) const {
   case BuiltinType::ObjCClass:
   case BuiltinType::ObjCId:
   case BuiltinType::ObjCSel:
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol:
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   case BuiltinType::Id:
 #include "clang/Basic/OpenCLImageTypes.def"

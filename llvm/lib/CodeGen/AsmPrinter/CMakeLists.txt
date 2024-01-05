@@ -45,3 +45,9 @@ add_llvm_component_library(LLVMAsmPrinter
   Target
   TargetParser
   )
+
+if (CMAKE_COMPILER_IS_GNUCXX)
+set_source_files_properties(DwarfCompileUnit.cpp PROPERTIES
+COMPILE_FLAGS -fno-strict-aliasing)
+endif()
+

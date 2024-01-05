@@ -1108,6 +1108,14 @@ void JSONNodeDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
       JOS.attribute("getter", createBareDeclRef(D->getGetterMethodDecl()));
     if (Attrs & ObjCPropertyAttribute::kind_setter)
       JOS.attribute("setter", createBareDeclRef(D->getSetterMethodDecl()));
+
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    if (Attrs & ObjCPropertyAttribute::kind_getter)
+      JOS.attribute("adder", createBareDeclRef(D->getAdderMethodDecl()));
+    if (Attrs & ObjCPropertyAttribute::kind_setter)
+      JOS.attribute("remover", createBareDeclRef(D->getRemoverMethodDecl()));
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
+
     attributeOnlyIfTrue("readonly",
                         Attrs & ObjCPropertyAttribute::kind_readonly);
     attributeOnlyIfTrue("assign", Attrs & ObjCPropertyAttribute::kind_assign);
@@ -1128,6 +1136,14 @@ void JSONNodeDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
                         Attrs & ObjCPropertyAttribute::kind_nullability);
     attributeOnlyIfTrue("null_resettable",
                         Attrs & ObjCPropertyAttribute::kind_null_resettable);
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    attributeOnlyIfTrue("dynamic", Attrs & ObjCPropertyAttribute::kind_dynamic);
+    attributeOnlyIfTrue("serializable", Attrs & ObjCPropertyAttribute::kind_serializable);
+    attributeOnlyIfTrue("nonserializable", Attrs & ObjCPropertyAttribute::kind_nonserializable);
+    attributeOnlyIfTrue("container", Attrs & ObjCPropertyAttribute::kind_container);
+    attributeOnlyIfTrue("observable", Attrs & ObjCPropertyAttribute::kind_observable);
+    attributeOnlyIfTrue("relationship", Attrs & ObjCPropertyAttribute::kind_relationship);
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
   }
 }
 

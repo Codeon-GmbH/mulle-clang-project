@@ -1,0 +1,119 @@
+#! /bin/sh
+
+[ "${TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+[ "${DUMP_ENV}" = 'YES' ] && env | sort >&2
+
+
+# It's assumed that the mono repo is unpacked in the current directory as
+# mulle-clang-project. Lets build it in 'build'.
+#
+# If you are in a docker container or VM or otherwise a fresh install use
+# mulle-clang-project/clang/bin/install-prerequisites
+#
+# MEMO: If you can't use ninja copy this file and make it cmake-make or so.
+PREFIX="${PREFIX:-/opt}"
+# VERSION / RC are passed in via mulle-clang-cpack
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.3.0}${RC}"
+
+#
+# Careful! sudo swallows environment variables given on the command line
+# e.g.  THIS_NO_WORK=Oops sudo env
+# e.g.  sudo THIS_WORK=Fine env
+
+printf "CMAKE_BUILD_TYPE="
+if [ "${CMAKE_BUILD_TYPE}" = "Debug" ]
+then
+   printf "\033[0;31m%s\033[0m\n" "\"${CMAKE_BUILD_TYPE}\""
+else
+   printf "\033[0;32m%s\033[0m\n" "\"${CMAKE_BUILD_TYPE:-Release}\""
+fi
+
+# On Ubuntu you need apt-get install libstdc++-12-dev (or some other
+# version number)
+#
+# Info from https://llvm.org/docs/BuildingADistribution.html
+#
+# https://stackoverflow.com/questions/67125654/how-to-get-ram-size-in-gb-in-bash-script
+RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+RAM_MB=$(expr $RAM_KB / 1024)
+RAM_GB=$(expr $RAM_MB / 1024)
+
+LINK_JOBS=$(expr $RAM_GB / 16)
+LINK_JOBS=${LINK_JOBS%[.,;]*}
+if [ ${LINK_JOBS:-0} -eq 0 ]
+then
+   LINK_JOBS=1
+fi
+
+
+[ ! -d build ] && mkdir build
+cd build &&
+cmake \
+   -DLLVM_BUILD_LLVM_DYLIB='ON' \
+   -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+   -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx"  \
+   -DLLVM_LINK_LLVM_DYLIB=ON \
+   -DLLVM_PARALLEL_LINK_JOBS=$LINK_JOBS \
+   -DLLVM_TARGETS_TO_BUILD="X86;ARM;AArch64" \
+\
+   -DCLANG_VENDOR='mulle' \
+\
+   -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" \
+   -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--reduce-memory-overheads" \
+   -DCMAKE_EXE_LINKER_FLAGS="-Wl,--reduce-memory-overheads" \
+   -DCMAKE_INSTALL_MESSAGE='LAZY' \
+   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+   -G Ninja \
+   ${CMAKEFLAGS} \
+   ../mulle-clang-project/llvm &&
+ninja ${NINJAFLAGS} "$@" stage2-distribution &&
+echo "Ninja install with sudo may require a password" >&2 &&
+${INSTALL_SUDO} ninja ${NINJAFLAGS} ${INSTALLFLAGS} stage2-distribution &&
+
+# pass in INSTALL_SUDO via env if needed
+
+# postprocess: remove llvm stuff that is not needed
+#              rename llvm stuff we need to m
+
+cd "${INSTALL_PREFIX}/bin" &&
+for bin in *
+do
+   case "${bin}" in
+      clang-[0-9]*)
+         ${INSTALL_SUDO} mv "$bin" "mulle-clang" || exit 1
+      ;;
+
+      llvm-nm)
+         ${INSTALL_SUDO} mv "$bin" "mulle-nm" || exit 1
+      ;;
+
+      analyze-build*|scan-build*)
+         ${INSTALL_SUDO} mv "$bin" "mulle-${bin}" || exit 1
+      ;;
+
+      mulle-*)
+         # protection if overwriting old /opt dir with contents
+      ;;
+
+      *)
+         echo "Removing ${bin}" >&2 &&
+         ${INSTALL_SUDO} rm "${bin}" || exit 1
+      ;;
+   esac
+done
+#&&
+#(
+#   #
+#   # remove more stuff we don't need for the compiler and scanbuild
+#   # to keep the compiler package down
+#   #
+#   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLLVM*.a
+#   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libc++*
+#   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang*.a
+#   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libclang.*
+#   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.so
+#   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libLTO.so*
+#   ${INSTALL_SUDO} rm "${INSTALL_PREFIX}"/lib/libRemarks.so*
+#   ${INSTALL_SUDO} rm -rf "${INSTALL_PREFIX}"/include/
+#)
+#

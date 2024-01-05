@@ -188,6 +188,9 @@ StringRef getLanguageName(Language Lang) {
   case Language::C:
     return "c";
   case Language::ObjC:
+  // @mulle-objc@ AAM:  .aam filename extension support >
+  case Language::ObjCAAM:
+  // @mulle-objc@ AAM:  .aam filename extension support <
     return "objective-c";
 
   // Unsupported language currently

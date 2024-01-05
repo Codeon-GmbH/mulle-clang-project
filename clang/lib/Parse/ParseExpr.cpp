@@ -779,6 +779,12 @@ class CastExpressionIdValidator final : public CorrectionCandidateCallback {
 /// [C++2a] requires-expression
 ///         '__func__'        [C99 6.4.2.2]
 /// [GNU]   '__FUNCTION__'
+/// @mulle-objc@ > add __OBJC_CLASS__ keyword
+/// [MULLE] '__OBJC_CLASS__'
+/// [MULLE] '__OBJC_CATEGORY__'
+/// [MULLE] '__MULLE_OBJC_CLASSID__'
+/// [MULLE] '__MULLE_OBJC_CATEGORYID__'
+/// @mulle-objc@ < add __OBJC_CLASS__ keyword
 /// [MS]    '__FUNCDNAME__'
 /// [MS]    'L__FUNCTION__'
 /// [MS]    '__FUNCSIG__'
@@ -1292,6 +1298,12 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
     break;
   case tok::kw___func__:       // primary-expression: __func__ [C99 6.4.2.2]
   case tok::kw___FUNCTION__:   // primary-expression: __FUNCTION__ [GNU]
+  // @mulle-objc@ > add __OBJC_CLASS__ keyword
+  case tok::kw___OBJC_CLASS__:      // primary-expression: __OBJC_CLASS__ [MULLE]
+  case tok::kw___OBJC_CATEGORY__:   // primary-expression: __OBJC_CATEGORY__ [MULLE]
+  case tok::kw___MULLE_OBJC_CLASSID__:      // primary-expression: __MULLE_OBJC_CLASSID__ [MULLE]
+  case tok::kw___MULLE_OBJC_CATEGORYID__:   // primary-expression: __MULLE_OBJC_CATEGORYID__ [MULLE]
+  // @mulle-objc@ < add __OBJC_CATEGORY__ keyword
   case tok::kw___FUNCDNAME__:   // primary-expression: __FUNCDNAME__ [MS]
   case tok::kw___FUNCSIG__:     // primary-expression: __FUNCSIG__ [MS]
   case tok::kw_L__FUNCTION__:   // primary-expression: L__FUNCTION__ [MS]

@@ -322,6 +322,14 @@ ENUM_LANGOPT(BFloat16ExcessPrecision, ExcessPrecisionKind, 2, FPP_Standard, "Int
 LANGOPT(NoBitFieldTypeAlign , 1, 0, "bit-field type alignment")
 LANGOPT(HexagonQdsp6Compat , 1, 0, "hexagon-qdsp6 backward compatibility")
 LANGOPT(ObjCAutoRefCount , 1, 0, "Objective-C automated reference counting")
+// @mulle-objc@ options >
+LANGOPT(ObjCDisableTaggedPointers , 1, 0, "Objective-C tagged pointer generation disabled")
+LANGOPT(ObjCDisableFastCalls , 1, 0, "Objective-C fast method/class calls are disabled")
+LANGOPT(ObjCAllocsAutoreleasedObjects , 1, 0, "Objective-C objects are created autoreleased")
+LANGOPT(ObjCClasscallUseSelf , 2, 0, "Objective-C method code assumes self is valid before [Class call]")
+LANGOPT(ObjCInlineMethodCalls , 3, 0, "Objective-C use inline method call")
+LANGOPT(ObjCReuseParam , 2, 0, "Objective-C method code can reuse _param space")
+// @mulle-objc@ options <
 LANGOPT(ObjCWeakRuntime     , 1, 0, "__weak support in the ARC runtime")
 LANGOPT(ObjCWeak            , 1, 0, "Objective-C __weak in ARC and MRC files")
 LANGOPT(ObjCSubscriptingLegacyRuntime         , 1, 0, "Subscripting support in legacy ObjectiveC runtime")

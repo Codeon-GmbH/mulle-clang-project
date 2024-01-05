@@ -2645,8 +2645,11 @@ static void GenerateFrontendArgs(const FrontendOptions &Opts,
       Lang = "c++";
       break;
     case Language::ObjC:
+// @mulle-objc@ add ObjcAAM >
+    case Language::ObjCAAM:
       Lang = "objective-c";
       break;
+// @mulle-objc@ add ObjcAAM <
     case Language::ObjCXX:
       Lang = "objective-c++";
       break;
@@ -2845,6 +2848,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                 .Case("hip", Language::HIP)
                 .Case("c++", Language::CXX)
                 .Case("objective-c", Language::ObjC)
+                // @mulle-objc@ AAM:  .aam filename extension support >
+                .Case("objective-c-aam", Language::ObjCAAM)
+                // @mulle-objc@ AAM:  .aam filename extension support <
                 .Case("objective-c++", Language::ObjCXX)
                 .Case("renderscript", Language::RenderScript)
                 .Case("hlsl", Language::HLSL)
@@ -3183,6 +3189,7 @@ static bool ParseHeaderSearchArgs(HeaderSearchOptions &Opts, ArgList &Args,
   return Diags.getNumErrors() == NumErrorsBefore;
 }
 
+
 /// Check if input file kind and language standard are compatible.
 static bool IsInputCompatibleWithStandard(InputKind IK,
                                           const LangStandard &S) {
@@ -3193,6 +3200,9 @@ static bool IsInputCompatibleWithStandard(InputKind IK,
 
   case Language::C:
   case Language::ObjC:
+  // @mulle-objc@ ObjCAAM >
+  case Language::ObjCAAM:
+  // @mulle-objc@ ObjCAAM
   case Language::RenderScript:
     return S.getLanguage() == Language::C;
 
@@ -3235,6 +3245,10 @@ static StringRef GetInputKindName(InputKind IK) {
     return "C";
   case Language::ObjC:
     return "Objective-C";
+  // @mulle-objc@ ObjCAAM >
+  case Language::ObjCAAM:
+    return "Objective-C AAM";
+  // @mulle-objc@ ObjCAAM <
   case Language::CXX:
     return "C++";
   case Language::ObjCXX:
@@ -3317,6 +3331,40 @@ void CompilerInvocation::GenerateLangArgs(const LangOptions &Opts,
 
   if (Opts.ObjC) {
     GenerateArg(Args, OPT_fobjc_runtime_EQ, Opts.ObjCRuntime.getAsString(), SA);
+
+    // @mulle-objc@ handle commandline flags part 2 >
+
+    if( Opts.ObjCUniverseName.length())
+      GenerateArg(Args, OPT_fobjc_universename_EQ, Opts.ObjCUniverseName, SA);
+    else
+      if( Opts.ObjCDisableTaggedPointers) // is implicit in universename
+         GenerateArg(Args, OPT_fno_objc_tps, SA);
+
+    if( Opts.ObjCDisableFastCalls)
+         GenerateArg(Args, OPT_fno_objc_fcs, SA);
+
+    if( Opts.ObjCAllocsAutoreleasedObjects)
+         GenerateArg(Args, OPT_fobjc_aam, SA);
+
+    if( Opts.ObjCClasscallUseSelf == 1)
+         GenerateArg(Args, OPT_fobjc_classcall_use_self, SA);
+    if( Opts.ObjCClasscallUseSelf == 2)
+         GenerateArg(Args, OPT_fobjc_classcall_init_use_self, SA);
+
+    if( Opts.ObjCReuseParam == 1)
+         GenerateArg(Args, OPT_fobjc_reuse_param, SA);
+    if( Opts.ObjCReuseParam == 2)
+         GenerateArg(Args, OPT_fno_objc_reuse_param, SA);
+
+    // 0 is unset, 1:none, 2: minimal, 3: partial, 4:full
+    if( Opts.ObjCInlineMethodCalls)
+    {
+      char   buf[ 32];
+      sprintf( buf, "%d", Opts.ObjCInlineMethodCalls);
+      GenerateArg(Args, OPT_fobjc_inline_method_calls, std::string( buf), SA);
+    }
+
+    // @mulle-objc@: handle AAM and TPS options Part 2<
 
     if (Opts.GC == LangOptions::GCOnly)
       GenerateArg(Args, OPT_fobjc_gc_only, SA);
@@ -3654,6 +3702,44 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
 
+    // @mulle-objc@: handle AAM and TPS options >
+    if( Args.hasArg( OPT_fno_objc_tps))
+      Opts.ObjCDisableTaggedPointers = 1;
+    if( Args.hasArg( OPT_fno_objc_fcs))
+      Opts.ObjCDisableFastCalls = 1;
+
+    StringRef value = Args.getLastArgValue(OPT_fobjc_universename_EQ);
+    if( value.size() != 0)
+    {
+      Opts.ObjCDisableTaggedPointers = 1;
+      Opts.ObjCUniverseName          = value.str();
+
+      // by default in multiverse configuration we use this optimization
+      if( ! Args.hasArg( OPT_fno_objc_classcall_use_self))
+         Opts.ObjCClasscallUseSelf = 1;
+    }
+    if( Args.hasArg( OPT_fobjc_aam))
+      Opts.ObjCAllocsAutoreleasedObjects = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_use_self))
+      Opts.ObjCClasscallUseSelf = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_init_use_self))
+      Opts.ObjCClasscallUseSelf = 2;
+    if( Args.hasArg( OPT_fobjc_reuse_param))
+      Opts.ObjCReuseParam = 1;
+    if( Args.hasArg( OPT_fno_objc_reuse_param))
+      Opts.ObjCReuseParam = 2;
+
+    // 0 is unset, 1:none, 2: minimal, 3: partial, 4:full
+    if( Args.hasArg( OPT_fobjc_inline_method_calls))
+    {
+       int   x = 4; // default if set (else why set ?)
+       StringRef value = Args.getLastArgValue(OPT_fobjc_inline_method_calls);
+       if( value.size() != 0)
+        value.getAsInteger( 10, x);
+       Opts.ObjCInlineMethodCalls = x ? x : 1;
+    }
+    // @mulle-objc@: handle AAM and TPS options <
+
     if (Args.hasArg(OPT_fobjc_gc_only))
       Opts.setGC(LangOptions::GCOnly);
     else if (Args.hasArg(OPT_fobjc_gc))
@@ -3741,12 +3827,20 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.Trigraphs =
       Args.hasFlag(OPT_ftrigraphs, OPT_fno_trigraphs, Opts.Trigraphs);
 
+// @mulle-objc@ can not deal with blocks >
+#if 0
   Opts.Blocks = Args.hasArg(OPT_fblocks) || (Opts.OpenCL
     && Opts.OpenCLVersion == 200);
 
-  Opts.ConvergentFunctions = Args.hasArg(OPT_fconvergent_functions) ||
+  Opts.ConvergentFunctions =Args.hasArg(OPT_fconvergent_functions) ||
                              Opts.OpenCL || (Opts.CUDA && Opts.CUDAIsDevice) ||
                              Opts.SYCLIsDevice;
+#endif
+// @mulle-objc@ can not deal with blocks <
+// @mulle-objc@ ElideConstructors interferes with C code >
+  Opts.ElideConstructors = 0; // !Args.hasArg(OPT_fno_elide_constructors);
+// @mulle-objc@ ElideConstructors interferes with C code <
+
 
   Opts.NoBuiltin = Args.hasArg(OPT_fno_builtin) || Opts.Freestanding;
   if (!Opts.NoBuiltin)

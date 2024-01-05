@@ -2689,6 +2689,32 @@ def fno_verbose_asm : Flag<["-"], "fno-verbose-asm">, Group<f_Group>, Flags<[CC1
   MarshallingInfoNegativeFlag<CodeGenOpts<"AsmVerbose">>;
 def fno_working_directory : Flag<["-"], "fno-working-directory">, Group<f_Group>;
 def fno_wrapv : Flag<["-"], "fno-wrapv">, Group<f_Group>;
+// @mulle-objc@ compiler options >
+def fobjc_tps : Flag<["-"], "fobjc-tps">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"use Objective-C tagged pointers for literals">;
+def fno_objc_tps : Flag<["-"], "fno-objc-tps">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"don't use Objective-C tagged pointers for literals">;
+def fobjc_fcs : Flag<["-"], "fobjc-fcs">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"use Objective-C method/class fast calls">;
+def fno_objc_fcs : Flag<["-"], "fno-objc-fcs">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"don't use Objective-C fast method/class calls">;
+def fobjc_universename_EQ : Joined<["-"], "fobjc-universename=">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"name of the Objective-C universe (enables multiverse), disables tps">;
+def fobjc_aam : Flag<["-"], "fobjc-aam">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"AlwaysAutoreleaseMode, +alloc becomes +instantiate">;
+def fno_objc_aam : Flag<["-"], "fno-objc-aam">, Group<f_Group>;
+def fobjc_classcall_use_self : Flag<["-"], "fobjc-classcall-use-self">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"+[Class call] in a method relies on self being set and alive">;
+def fobjc_classcall_init_use_self : Flag<["-"], "fobjc-classcall-init-use-self">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"+[Class call] in init/dealloc and related methods relies on self being set and alive">;
+def fno_objc_classcall_use_self : Flag<["-"], "fno-objc-classcall-use-self">, Group<f_Group>;
+def fobjc_inline_method_calls : Joined<["-"], "fobjc-inline-method-calls=">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Choose method call inlining code (1-4)">;
+def fobjc_reuse_param : Flag<["-"], "fobjc-reuse-param">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Allow _param to be reused for a method call">;
+def fno_objc_reuse_param : Flag<["-"], "fno-objc-reuse-param">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"Disallow _param to be reused for a method call">;
+// @mulle-objc@ compiler options <
 def fobjc_arc : Flag<["-"], "fobjc-arc">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Synthesize retain and release calls for Objective-C pointers">;
 def fno_objc_arc : Flag<["-"], "fno-objc-arc">, Group<f_Group>;

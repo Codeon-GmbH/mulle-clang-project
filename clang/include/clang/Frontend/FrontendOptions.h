@@ -191,7 +191,9 @@ public:
 
   /// Is the language of the input some dialect of Objective-C?
   bool isObjectiveC() const {
-    return Lang == Language::ObjC || Lang == Language::ObjCXX;
+   // @mulle-objc@  AAM is a dialect of ObjC >
+    return Lang == Language::ObjC || Lang == Language::ObjCAAM || Lang == Language::ObjCXX;
+   // @mulle-objc@  AAM is a dialect of ObjC <
   }
 
   InputKind getPreprocessed() const {

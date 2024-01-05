@@ -7389,6 +7389,70 @@ static bool handleLValueToRValueBitCast(EvalInfo &Info, APValue &DestValue,
   return true;
 }
 
+// @mulle-objc@: give access to hash calculation >
+extern "C"
+{
+//
+// nm lib/libclangCodeGen.a | grep HashForString
+// 00000000000006e0 T _MulleObjCUniqueIdHashForString
+// nm lib/libclangAST.a | grep HashForString
+//                 U _MulleObjCUniqueIdHashForString
+// But:
+// Undefined symbols for architecture x86_64:
+//  "_MulleObjCUniqueIdHashForString", referenced from:
+//
+#define FNV1A_32_PRIME             0x01000193
+#define MULLE_OBJC_FNV1A_32_INIT   0x811c9dc5
+
+
+static uint32_t   mulle_objc_chained_fnv1a_32( void *buf, size_t len, uint32_t hash)
+{
+   unsigned char   *s;
+   unsigned char   *sentinel;
+
+   s        = (unsigned char *) buf;
+   sentinel = &s[ len];
+
+    /*
+     * FNV-1 hash each octet in the buffer
+     */
+    while( s < sentinel)
+    {
+       hash ^= (uint32_t) *s++;
+       hash *= FNV1A_32_PRIME;
+    }
+
+    return( hash);
+}
+
+
+static inline uint32_t   mulle_objc_fnv1a_32( void *buf, size_t len)
+{
+   return( mulle_objc_chained_fnv1a_32( buf, len, MULLE_OBJC_FNV1A_32_INIT));
+}
+
+
+//
+// global no more
+//
+uint32_t  MulleObjCUniqueIdHashForString( std::string s)
+{
+   uint32_t   value;
+   char       *c_str;
+
+   c_str = const_cast< char *>( s.c_str());
+   value = mulle_objc_fnv1a_32( (void *) c_str, s.length());
+   value = (value << 4) | (value >> (32 - 4));
+
+   //fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
+
+   return( value);
+}
+
+} // extern C
+// @mulle-objc@: give access to hash calculation <
+
+
 template <class Derived>
 class ExprEvaluatorBase
   : public ConstStmtVisitor<Derived, bool> {
@@ -7493,6 +7557,35 @@ public:
 
     return StmtVisitorTy::Visit(E->getSubExpr());
   }
+
+  // @mulle-objc@ : @selector and @protocol as constant expression >>>
+  bool VisitObjCSelectorExpr( const ObjCSelectorExpr *E) {
+     if( ! getEvalInfo().getLangOpts().ObjCRuntime.hasConstantSelector())
+        return( VisitExpr( E));
+
+     uint32_t   hash;
+
+     hash = MulleObjCUniqueIdHashForString( E->getSelector().getAsString());
+     if( ! hash || hash == (uint32_t) -1)
+        return Error(E);
+     APValue Result( APSInt( llvm::APInt( 32, hash)));
+     return DerivedSuccess(Result, E);
+  }
+
+  bool VisitObjCProtocolExpr( const ObjCProtocolExpr *E) {
+      if( ! getEvalInfo().getLangOpts().ObjCRuntime.hasConstantSelector())
+           return( VisitExpr( E));
+
+     uint32_t   hash;
+
+     hash = MulleObjCUniqueIdHashForString( E->getProtocol()->getNameAsString());
+     if( ! hash || hash == (uint32_t) -1)
+        return Error(E);
+
+     APValue Result( APSInt( llvm::APInt( 32, hash)));
+     return DerivedSuccess(Result, E);
+  }
+  // @mulle-objc@ : @selector and @protocol as constant expression <<<
 
   bool VisitParenExpr(const ParenExpr *E)
     { return StmtVisitorTy::Visit(E->getSubExpr()); }
@@ -11406,6 +11499,9 @@ EvaluateBuiltinClassifyType(QualType T, const LangOptions &LangOpts) {
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
     case BuiltinType::Id:
 #include "clang/Basic/OpenCLImageTypes.def"
@@ -15734,8 +15830,12 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::ObjCDictionaryLiteralClass:
   case Expr::ObjCEncodeExprClass:
   case Expr::ObjCMessageExprClass:
+  // @mulle-objc@ uniqueid: make @selector() and @protocol() constants integers >
+    return ICEDiag(IK_NotICE, E->getBeginLoc());
   case Expr::ObjCSelectorExprClass:
   case Expr::ObjCProtocolExprClass:
+    return ICEDiag(IK_ICE, E->getBeginLoc());
+  // @mulle-objc@ uniqueid: make @selector() and @protocol() constants integers <
   case Expr::ObjCIvarRefExprClass:
   case Expr::ObjCPropertyRefExprClass:
   case Expr::ObjCSubscriptRefExprClass:

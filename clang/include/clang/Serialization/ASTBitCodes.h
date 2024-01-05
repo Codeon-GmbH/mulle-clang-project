@@ -1078,6 +1078,10 @@ enum PredefinedTypeIDs {
 
   /// \brief The '__ibm128' type
   PREDEF_TYPE_IBM128_ID = 74,
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  /// The ObjC 'Protocol' type.
+  PREDEF_TYPE_OBJC_PROTOCOL = 75,
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
 /// OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix)                   \
@@ -1157,12 +1161,19 @@ enum SpecialTypeIDs {
   /// Objective-C "SEL" redefinition type
   SPECIAL_TYPE_OBJC_SEL_REDEFINITION = 6,
 
+  /// @mulle-objc@ Objective-C "PROTOCOL" redefinition type >
+  /// also change NumSpecialTypeIDs
+  SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION = 7,
+  /// @mulle-objc@  Objective-C "PROTOCOL" redefinition type <
+
   /// C ucontext_t typedef type
-  SPECIAL_TYPE_UCONTEXT_T = 7
+  SPECIAL_TYPE_UCONTEXT_T = 8
 };
 
 /// The number of special type IDs.
-const unsigned NumSpecialTypeIDs = 8;
+/// @mulle-objc@ Objective-C "PROTOCOL" redefinition type >
+const unsigned NumSpecialTypeIDs = 9;
+/// @mulle-objc@ Objective-C "PROTOCOL" redefinition type <
 
 /// Predefined declaration IDs.
 ///

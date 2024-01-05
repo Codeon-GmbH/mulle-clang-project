@@ -334,13 +334,27 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
 
   case Type::Builtin: {
     switch (cast<BuiltinType>(Ty)->getKind()) {
-    case BuiltinType::Void:
-    case BuiltinType::ObjCId:
-    case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    case BuiltinType::ObjCProtocol:
+      // @mulle-objc@ uniqueid: sel: change type to uint32_t
+      //                        "Class" itself is in Objective-C still an id
+      //  need something like @classid()
+      //
+      if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         ResultType = llvm::IntegerType::get(getLLVMContext(),
+                                 static_cast<unsigned>(Context.getTypeSize(Context.getIntTypeForBitwidth(32, false))))  ;
+         break;
+      }
+
+      // @mulle-objc@ id: is a void ptr
+      LLVM_FALLTHROUGH;
       // LLVM void type can only be used as the result of a function call.  Just
       // map to the same as char.
-      ResultType = llvm::Type::getInt8Ty(getLLVMContext());
+    case BuiltinType::ObjCClass:
+    case BuiltinType::ObjCId:
+    case BuiltinType::Void:
+         ResultType = llvm::Type::getInt8Ty(getLLVMContext());
       break;
 
     case BuiltinType::Bool:

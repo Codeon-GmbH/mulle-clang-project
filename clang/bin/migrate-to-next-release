@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+
+[ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
+
+#
+# When the llvm project makes releases, they are in a branch as well as
+# tags. mulle-clang development corresponds to each versions branch, but
+# we use a 'tag' to do the merge. So we have mulle/12.0.0 corresponding
+# to llvmorg-12.0.0 and so forth.
+# When it's time to release, we create a new branch and squash all the
+# accumulated commits into this new branch. So effectively from the original
+# llvm project, we are only one (big) commit away.
+# Now we checkout the llvm project and cherrypick this big commit. All our
+# changes are restricted to llvm_project/clang.
+#
+# $ git remote -v
+# llvm   https://github.com/llvm/llvm-project.git (fetch)
+# llvm  https://github.com/llvm/llvm-project.git (push)
+# $ git fetch llvm --tags llvmorg-17.0.6
+#
+
+
+# Current branch we are developing from and the llvm tag where it
+# branched of from
+OLD_LLVM_TAG="llvmorg-15.0.7"
+OLD_MULLE_DEV_BRANCH="mulle/15.0.7"
+
+# The llvm where we want to glom our changes unto
+NEW_LLVM_TAG="llvmorg-17.0.6"
+# the name of the new branch we want to develop on from now
+NEW_MULLE_DEV_BRANCH="mulle/17.0.6"
+
+# usually don't edit these
+
+LLVM_PROJECT="clang"                                           # lldb for lldb
+SOURCEDIRS="${LLVM_PROJECT}/include/ ${LLVM_PROJECT}/lib/"     # include/ source/ for lldb
+
+# check files used by this script
+BEFOREFILE=.before-markers.txt
+AFTERFILE=.after-markers.txt
+
+
+#
+# these functions should be identical in mulle-clang/mulle-lldb
+# If you edit them edit the corresponding file too
+#
+
+####### >-> DONT EDIT >->
+migrate()
+{
+   echo "### 1: Sanity Checks" >&2 &&
+
+   if ! git rev-parse --verify "${OLD_LLVM_TAG}" > /dev/null 2>&1
+   then
+      echo "Old llvm tag ${OLD_LLVM_TAG} must exist" >&2 && exit 1
+   fi
+
+   if ! git rev-parse --verify "${NEW_LLVM_TAG}" > /dev/null 2>&1
+   then
+      echo "New llvm tag ${NEW_LLVM_TAG} must exist" >&2 && exit 1
+   fi
+
+   if ! git rev-parse --verify "${OLD_MULLE_DEV_BRANCH}" > /dev/null 2>&1
+   then
+      echo "Old mulle branch ${OLD_MULLE_DEV_BRANCH} must exist" >&2 && exit 1
+   fi
+
+   if git rev-parse --verify "${NEW_MULLE_DEV_BRANCH}" > /dev/null 2>&1
+   then
+      echo "New mulle branch ${NEW_MULLE_DEV_BRANCH} must not exist" >&2 && exit 1
+   fi
+
+   #
+   # remove garbage tmp if present
+   #
+   if git rev-parse --verify "tmp_${NEW_MULLE_DEV_BRANCH}" > /dev/null 2>&1
+   then
+      git branch -D "tmp_${NEW_MULLE_DEV_BRANCH}" || exit 1
+   fi
+
+   #
+   # remove garbage tag if present
+   #
+   if git rev-parse --verify "squashed_${OLD_MULLE_DEV_BRANCH}" > /dev/null 2>&1
+   then
+      git tag -d "squashed_${OLD_MULLE_DEV_BRANCH}" || exit 1
+   fi
+
+   echo "### 2: Determine Ancestor" >&2 &&
+
+   ancestor="`git merge-base "${OLD_LLVM_TAG}" "${OLD_MULLE_DEV_BRANCH}"`"
+   [ -z "${ancestor}" ] && echo "No common ancestor found" >&2 && exit 1
+
+
+   # create a new temporary branch to contain squashed patchset
+   echo "### 3: Checkout into temporary branch" >&2 &&
+
+   git checkout -b "tmp_${NEW_MULLE_DEV_BRANCH}" "${ancestor}" || exit 1
+
+   #
+   # squash everything into new branch
+   # this helps weed out re-edits and commits that weren't useful
+   # easing the conflict resolution
+   #
+   # ???? git merge --squash "tmp_${OLD_MULLE_DEV_BRANCH}"
+   echo "### 4: Squash Merge" >&2
+
+   git merge --squash "${OLD_MULLE_DEV_BRANCH}" || exit 1
+
+   echo "### 5: Add changed script files" >&2
+
+   cp "${TMPDIR:-/tmp}/migrate-to-next-release" "${LLVM_PROJECT}/bin/" || exit 1
+   chmod +x "${LLVM_PROJECT}/bin/migrate-to-next-release"
+   git add "${LLVM_PROJECT}/bin/migrate-to-next-release"
+
+   #
+   # There shouldn't be any problem until here. If there is a failure, before
+   # this, you may run into a problem with scripts not being in /tmp
+   #
+
+   # commit stuff
+   echo "### 6: Commit" >&2
+
+   git commit -m "${OLD_MULLE_DEV_BRANCH} squashed + new version numbers" || exit 1
+
+   #
+   # remember until where did we squash the old branch (in case of
+   # future edits)
+   echo "### 7: Tag" >&2
+
+   git tag "squashed_${OLD_MULLE_DEV_BRANCH}" "${OLD_MULLE_DEV_BRANCH}" || exit 1
+
+   # count our change marker texts
+   grep -R '@mulle-' ${SOURCEDIRS} > "${BEFOREFILE}" || exit 1
+
+   #
+   # Now get the new stuff
+   #
+   echo "### 8: Checkout" >&2
+
+   git checkout -b "${NEW_MULLE_DEV_BRANCH}" "${NEW_LLVM_TAG}" || exit 1
+
+
+   echo "### 9: Cherry pick" >&2
+
+   if ! git cherry-pick "tmp_${NEW_MULLE_DEV_BRANCH}"
+   then
+      git status -s
+      exit 1
+   fi
+}
+
+
+cleanup()
+{
+   if [ "${MULLE_FLAG_MAGNUM_FORCE}" != 'YES' ]
+   then
+      # count our change marker texts again
+      grep -R '@mulle-' ${SOURCEDIRS} > "${AFTERFILE}" || exit 1
+
+      local before
+      local after
+
+      before="`cat "${BEFOREFILE}" `"
+      after="`cat "${AFTERFILE}" `"
+
+      if [ "${before}" != "${after}" ]
+      then
+         echo "Some @mulle- tags got lost in the merge" >&2
+         echo "before : ${BEFOREFILE}" >&2
+         echo "after  : ${AFTERFILE}" >&2
+         diff "${BEFOREFILE}" "${AFTERFILE}" >&2
+         exit 1
+      fi
+   fi
+
+   #
+   # resolve conflicts manually.
+   # Check with grep '@mulle-objc' ... | wc -l, that all changes are present
+   #
+   echo "### 10: Tmp branch delete" >&2
+
+   git branch -D "tmp_${NEW_MULLE_DEV_BRANCH}" || exit 1
+   rm "${AFTERFILE}" "${BEFOREFILE}"
+}
+
+
+####### <-< DONT EDIT <-<
+
+#
+# Since an old version of this script gets will get checked out over the new
+# One we copy script to /tmp and exec there
+#
+[ ! -e "${LLVM_PROJECT}/BUILD_MULLE_CLANG.md" ] \
+&& echo "cd to the root of mulle-clang-project" >&2 && exit 1
+
+case "$0" in
+   "${TMPDIR:-/tmp}"*)
+   ;;
+
+   *)
+      echo "### 0: Executing script \"$0\" from tmp. To prevent accidental clobber of edits" >&2
+
+      cp "$0" "${TMPDIR:-/tmp}" || exit 1
+      chmod 755 "${TMPDIR:-/tmp}/migrate-to-next-release" || exit 1
+      exec "${TMPDIR:-/tmp}/migrate-to-next-release" "$@"
+   ;;
+esac
+
+case "$1" in
+   -f)
+      MULLE_FLAG_MAGNUM_FORCE='YES'
+      shift
+   ;;
+esac
+
+
+case "$1" in
+   'continue'|'cleanup')
+      cleanup
+   ;;
+
+   *)
+      if [ ! -f "${AFTERFILE}" ]
+      then
+         migrate
+      fi
+      cleanup
+   ;;
+esac

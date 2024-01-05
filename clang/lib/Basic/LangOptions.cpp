@@ -103,6 +103,14 @@ void LangOptions::setLangDefaults(LangOptions &Opts, Language Lang,
     Opts.ObjC = 1;
   }
 
+  // @mulle-objc@ AAM:  .aam filename extension support >
+  if( Lang == Language::ObjCAAM)
+  {
+     Opts.ObjCAllocsAutoreleasedObjects = 1;
+     Opts.ObjC = 1;
+  }
+  // @mulle-objc@ AAM:  .aam filename extension support <
+
   if (LangStd == LangStandard::lang_unspecified)
     LangStd = getDefaultLanguageStandard(Lang, T);
   const LangStandard &Std = LangStandard::getLangStandardForKind(LangStd);

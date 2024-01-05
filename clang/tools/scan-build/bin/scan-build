@@ -1198,7 +1198,7 @@ OPTIONS:
 
   By default the output of scan-build is a set of HTML files. This option
   outputs the results in SARIF format.
- 
+
  -plist
 
    By default the output of scan-build is a set of HTML files. This option
@@ -1525,6 +1525,52 @@ sub FindClang {
   return undef;
 }
 
+# @mulle-clang@ search for mulle-clang instead >
+sub FindMulleClang {
+  if (!defined $Options{AnalyzerDiscoveryMethod}) {
+    $Clang = Cwd::realpath("$RealBin/bin/mulle-clang") if (-f "$RealBin/bin/mulle-clang");
+    if (!defined $Clang || ! -x $Clang) {
+      $Clang = Cwd::realpath("$RealBin/mulle-clang") if (-f "$RealBin/mulle-clang");
+      if (!defined $Clang || ! -x $Clang) {
+        # When an Xcode toolchain is present, look for a mulle-clang in the sibling bin
+        # of the parent of the bin directory. So if scan-build is at
+        # $TOOLCHAIN/usr/local/bin/scan-build look for mulle-clang at
+        # $TOOLCHAIN/usr/bin/mulle-clang.
+        my $has_xcode_toolchain = FindXcrun() ne "";
+        if ($has_xcode_toolchain && -f "$RealBin/../../bin/mulle-clang") {
+          $Clang = Cwd::realpath("$RealBin/../../bin/mulle-clang");
+        }
+      }
+    }
+    if (!defined $Clang || ! -x $Clang) {
+      return "error: Cannot find an executable 'mulle-clang' relative to" .
+             " scan-build. Consider using --use-analyzer to pick a version of" .
+             " 'mulle-clang' to use for static analysis.\n";
+    }
+  }
+  else {
+    if ($Options{AnalyzerDiscoveryMethod} =~ /^[Xx]code$/) {
+      my $xcrun = FindXcrun();
+      if ($xcrun eq "") {
+        return "Cannot find 'xcrun' to find 'mulle-clang' for analysis.\n";
+      }
+      $Clang = `$xcrun -toolchain XcodeDefault -find mulle-clang`;
+      chomp $Clang;
+      if ($Clang eq "") {
+        return "No 'mulle-clang' executable found by 'xcrun'\n";
+      }
+    }
+    else {
+      $Clang = $Options{AnalyzerDiscoveryMethod};
+      if (!defined $Clang or not -x $Clang) {
+        return "Cannot find an executable mulle-clang at '$Options{AnalyzerDiscoveryMethod}'\n";
+      }
+    }
+  }
+  return undef;
+}
+# @mulle-clang@ search for mulle-clang instead <
+
 ##----------------------------------------------------------------------------##
 # Process command-line arguments.
 ##----------------------------------------------------------------------------##
@@ -1841,7 +1887,10 @@ if (!@ARGV) {
 ProcessArgs(\@ARGV);
 # All arguments are now shifted from @ARGV. The rest is a build command, if any.
 
-my $ClangNotFoundErrMsg = FindClang();
+# @mulle-clang@ search for mulle-clang instead >
+my $ClangNotFoundErrMsg = FindMulleClang();
+# @mulle-clang@ search for mulle-clang instead <
+# my $ClangNotFoundErrMsg = FindClang();
 
 if ($ForceDisplayHelp || $RequestDisplayHelp) {
   DisplayHelp($ClangNotFoundErrMsg);

@@ -2917,6 +2917,89 @@ ExprResult Sema::BuildQualifiedDeclarationNameExpr(
   return BuildDeclarationNameExpr(SS, R, /* ADL */ false);
 }
 
+
+// @mulle-objc@ MetaABI: GetMulle_paramExpr create an expression to access _param by name >>
+ExprResult   Sema::GetMulle_paramExpr( Scope *S, SourceLocation Loc, StringRef Name)
+{
+   DeclarationName   DN;
+   IdentifierInfo    *II;
+
+   // hacked together without a clue
+   II  = &Context.Idents.get( Name);
+   DN  = DeclarationName( II);
+
+   LookupResult R( *this, DN, Loc, LookupOrdinaryName);
+   LookupParsedName( R, S, NULL, false);
+   if( ! R.empty())
+      return( BuildDeclarationNameExpr( CXXScopeSpec(), R, false));
+
+   // this can't really happen
+   return ExprError();
+}
+
+
+ExprResult   Sema::GetMulle_paramExprAsType( QualType type, Scope *S, SourceLocation Loc, StringRef Name)
+{
+   DeclarationName   DN;
+   IdentifierInfo    *II;
+   ExprResult        E;
+
+   // hacked together without a clue
+   II  = &Context.Idents.get( Name);
+   DN  = DeclarationName( II);
+
+   LookupResult R( *this, DN, Loc, LookupOrdinaryName);
+   LookupParsedName( R, S, NULL, false);
+   if( ! R.empty())
+   {
+      ValueDecl *VD = dyn_cast<ValueDecl>( R.getFoundDecl());
+      if( VD)
+      {
+         E = BuildDeclRefExpr( VD, type, VK_LValue, Loc);
+         E.get()->viewAST();
+         return( E);
+      }
+   }
+
+   // this can't really happen
+   return ExprError();
+}
+
+
+
+/* @mulle-objc@ MetaABI: GetMulle_paramFieldExpr create an expression to access _param->field */
+ExprResult
+Sema::GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, SourceLocation Loc)
+{
+     // this couldn't be any easier...
+     DeclarationNameInfo   memberNameInfo( FD->getDeclName(), Loc);
+     DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
+     ExprResult BaseExpr = GetMulle_paramExpr( S, Loc, "_param");
+     ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
+/*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_PRValue);
+*/
+     ExprResult Result   = MemberExpr::Create( Context,
+                                              CastExpr.get(),
+                                              true,
+                                              SourceLocation(),   // (nat) blind add
+                                              CXXScopeSpec().getWithLocInContext(Context),
+                                              SourceLocation(), // invalid template location
+                                              FD,
+                                              fakeFoundDecl,
+                                              memberNameInfo,
+                                              nullptr,
+                                              FD->getType(),
+                                              VK_LValue, // maybe so, maybe not so
+                                              OK_Ordinary,
+                                              NOUR_None);
+
+     MarkAnyDeclReferenced(Loc, FD, true);
+
+     return( Result);
+}
+
+// @mulle-objc@ MetaABI: GetMulle_paramExpr create an expression to access _param by name <<
+
 /// The parser has read a name in, and Sema has detected that we're currently
 /// inside an ObjC method. Perform some additional checks and determine if we
 /// should form a reference to an ivar.
@@ -2968,6 +3051,14 @@ DeclResult Sema::LookupIvarInObjCMethod(LookupResult &Lookup, Scope *S,
           !declaresSameEntity(ClassDeclared, IFace) &&
           !getLangOpts().DebuggerSupport)
         Diag(Loc, diag::err_private_ivar_access) << IV->getDeclName();
+
+       // @mulle-objc@ AAM:  In AAM ivars are just not available >
+      if ( getLangOpts().ObjCAllocsAutoreleasedObjects)
+      {
+         Diag(Loc, diag::error_mulle_aam_ivar_access) << IV->getDeclName();
+         return DeclResult(true);
+      }
+      // @mulle-objc@ AAM:  In AAM ivars are just not available <
 
       // Success.
       return IV;
@@ -3062,6 +3153,24 @@ ExprResult Sema::BuildIvarRefExpr(Scope *S, SourceLocation Loc,
 ExprResult
 Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
                          IdentifierInfo *II, bool AllowBuiltinCreation) {
+
+  //
+  // @mulle-objc@ MetaABI: Create MemberExpr for _param-><name>
+  // (nat) lookup if this is one of our parameters
+  //
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     FieldDecl   *FD;
+     ObjCMethodDecl *CurMethod = getCurMethodDecl();
+
+     if (!CurMethod)
+       return ExprError();
+     FD = CurMethod->FindParamRecordField( II);
+     if( FD)
+        return( GetMulle_paramFieldExpr( FD, S, SourceLocation()));
+  }
+// @mulle-objc@ add CXXScopeSpec for MetaABI <
+
   // FIXME: Integrate this lookup step into LookupParsedName.
   DeclResult Ivar = LookupIvarInObjCMethod(Lookup, S, II);
   if (Ivar.isInvalid())
@@ -3623,6 +3732,15 @@ static void ConvertUTF8ToWideString(unsigned CharByteWidth, StringRef Source,
   Target.resize(ResultPtr - &Target[0]);
 }
 
+
+// @mulle-objc@: >>
+extern "C"
+{
+   extern uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+}
+// @mulle-objc@: <<
+
+
 ExprResult Sema::BuildPredefinedExpr(SourceLocation Loc,
                                      PredefinedExpr::IdentKind IK) {
   // Pick the current block, lambda, captured statement or function.
@@ -3650,6 +3768,23 @@ ExprResult Sema::BuildPredefinedExpr(SourceLocation Loc,
     // the string.
     auto Str = PredefinedExpr::ComputeName(IK, currentDecl);
     unsigned Length = Str.length();
+
+    // @mulle-objc@ < add __OBJC_CLASS__ keyword
+    if (IK == PredefinedExpr::MulleObjCClassid || IK == PredefinedExpr::MulleObjCCategoryid)
+    {
+        uint32_t   hash;
+
+        hash = 0;
+        if( Length != 0)
+        {
+           hash = MulleObjCUniqueIdHashForString( Str);
+           if( ! hash || hash == (uint32_t) -1)
+              return ExprError( Diag(Loc, diag::err_mulle_string_hash_invalid) << Str);  // fix string
+        }
+        ResTy = Context.IntTy.withConst();
+        return( IntegerLiteral::Create( Context, llvm::APInt( 32, hash), ResTy, Loc));
+    }
+    // @mulle-objc@ < add __OBJC_CLASS__ keyword
 
     llvm::APInt LengthI(32, Length + 1);
     if (IK == PredefinedExpr::LFunction || IK == PredefinedExpr::LFuncSig) {
@@ -3706,6 +3841,12 @@ ExprResult Sema::ActOnPredefinedExpr(SourceLocation Loc, tok::TokenKind Kind) {
   default: llvm_unreachable("Unknown simple primary expr!");
   case tok::kw___func__: IK = PredefinedExpr::Func; break; // [C99 6.4.2.2]
   case tok::kw___FUNCTION__: IK = PredefinedExpr::Function; break;
+  // @mulle-objc@ > add __OBJC_CLASS__ keyword
+  case tok::kw___OBJC_CLASS__:            IK = PredefinedExpr::ObjCClass; break; // [MULLE/ALL]
+  case tok::kw___OBJC_CATEGORY__:         IK = PredefinedExpr::ObjCCategory; break; // [MULLE/ALL]
+  case tok::kw___MULLE_OBJC_CLASSID__:    IK = PredefinedExpr::MulleObjCClassid; break; // [MULLE/ALL]
+  case tok::kw___MULLE_OBJC_CATEGORYID__: IK = PredefinedExpr::MulleObjCCategoryid; break; // [MULLE/ALL]
+  // @mulle-objc@ < add __OBJC_CLASS__ keyword
   case tok::kw___FUNCDNAME__: IK = PredefinedExpr::FuncDName; break; // [MS]
   case tok::kw___FUNCSIG__: IK = PredefinedExpr::FuncSig; break; // [MS]
   case tok::kw_L__FUNCTION__: IK = PredefinedExpr::LFunction; break; // [MS]
@@ -5845,7 +5986,9 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
 
     // Use custom logic if this should be the pseudo-object subscript
     // expression.
-    if (!LangOpts.isSubscriptPointerArithmetic())
+    // @mulle-objc@ language: turn off array subscripting >
+    if (!LangOpts.isSubscriptPointerArithmetic() && ! LangOptions().ObjCRuntime.hasMulleMetaABI())
+    // @mulle-objc@ language: turn off array subscripting <
       return BuildObjCSubscriptExpression(RLoc, BaseExpr, IndexExpr, nullptr,
                                           nullptr);
 
@@ -9287,6 +9430,20 @@ QualType Sema::FindCompositeObjCPointerType(ExprResult &LHS, ExprResult &RHS,
     LHS = ImpCastExprToType(LHS.get(), RHSTy, CK_BitCast);
     return RHSTy;
   }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  // And the same for uniqueid_t / PROTOCOL
+  if (Context.isObjCProtocolType(LHSTy) &&
+      (Context.hasSameType(RHSTy, Context.getObjCPROTOCOLRedefinitionType()))) {
+    RHS = ImpCastExprToType(RHS.get(), LHSTy, CK_BitCast);
+    return LHSTy;
+  }
+  if (Context.isObjCProtocolType(RHSTy) &&
+      (Context.hasSameType(LHSTy, Context.getObjCPROTOCOLRedefinitionType()))) {
+    LHS = ImpCastExprToType(LHS.get(), RHSTy, CK_BitCast);
+    return RHSTy;
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+
   // Check constraints for Objective-C object pointers types.
   if (LHSTy->isObjCObjectPointerType() && RHSTy->isObjCObjectPointerType()) {
 

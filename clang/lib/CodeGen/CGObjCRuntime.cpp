@@ -358,10 +358,12 @@ void CGObjCRuntime::EmitAtSynchronizedStmt(CodeGenFunction &CGF,
 /// \param method - may be null
 /// \param resultType - the result type to use if there's no method
 /// \param callArgs - the actual arguments, including implicit ones
+// @mulle-objc@ add isSuper to getMessageSendInfo >
 CGObjCRuntime::MessageSendInfo
 CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
                                   QualType resultType,
-                                  CallArgList &callArgs) {
+                                  CallArgList &callArgs,
+                                  bool isSuper) {
   unsigned ProgramAS = CGM.getDataLayout().getProgramAddressSpace();
 
   llvm::PointerType *signatureType =
@@ -370,7 +372,8 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
   // If there's a method, use information from that.
   if (method) {
     const CGFunctionInfo &signature =
-      CGM.getTypes().arrangeObjCMessageSendSignature(method, callArgs[0].Ty);
+      CGM.getTypes().arrangeObjCMessageSendSignature(method, callArgs[0].Ty, isSuper);
+// @mulle-objc@ add isSuper to getMessageSendInfo <
 
     const CGFunctionInfo &signatureForCall =
       CGM.getTypes().arrangeCall(signature, callArgs);
@@ -477,3 +480,97 @@ std::string CGObjCRuntime::getSymbolNameForMethod(const ObjCMethodDecl *OMD,
                                        includeCategoryName);
   return buffer;
 }
+
+// @mulle-objc@ MetaABI: to generate LLVM method argument list >
+//   this is done differently in mulle-objc so this little code
+//   snippet is placed into the runtime
+//
+CGObjCRuntimeLifetimeMarker   CGObjCRuntime::GenerateCallArgs( CodeGenFunction &CGF,
+                                                               CallArgList &Args,
+                                                               const ObjCMethodDecl *method,
+                                                               const ObjCMessageExpr *Expr)
+{
+   CGObjCRuntimeLifetimeMarker  Marker;
+   CGF.EmitCallArgs( Args, method, Expr->arguments());
+
+   Marker.SizeV = nullptr;
+   Marker.Addr  = nullptr;
+   return( Marker);
+}
+
+
+CGObjCRuntimeLifetimeMarker   CGObjCRuntime::ConvertToMetaABIArgsIfNeeded( CodeGenFunction &CGF,
+                                                                           const ObjCMethodDecl *method,
+                                                                           CallArgList &Args)
+{
+   CGObjCRuntimeLifetimeMarker  Marker;
+
+   Marker.SizeV = nullptr;
+   Marker.Addr  = nullptr;
+   return( Marker);
+}
+
+
+void   CGObjCRuntime::GenerateForwardClass(const ObjCInterfaceDecl *OID)
+{
+   // do nothing
+}
+
+
+llvm::Constant  *CGObjCRuntime::GenerateConstantSelector( Selector sel)
+{
+   // shouldn't be called for non-participating runtimes
+   return( nullptr);
+}
+
+llvm::Constant  *CGObjCRuntime::GenerateConstantProtocol( ObjCProtocolDecl *protocol)
+{
+   // shouldn't be called for non-participating runtimes
+   return( nullptr);
+}
+// @mulle-objc@ MetaABI: to generate LLVM method argument list <
+
+
+// @mulle-objc@ possibly unused function >
+CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                                       ReturnValueSlot ReturnSlot,
+                                                       QualType ResultType,
+                                                       Selector Sel,
+                                                       llvm::Value *Receiver,
+                                                       llvm::Value *StatePtr,
+                                                       QualType StateTy,
+                                                       llvm::Value *ItemsPtr,
+                                                       QualType ItemsTy,
+                                                       llvm::Value *Count,
+                                                       QualType CountTy)
+
+{
+   return( RValue::get( Receiver));  // bogus, this code is never used
+}
+// @mulle-objc@ possibly unused function <
+
+
+// @mulle-objc@ new property attributes container, observable >>>
+llvm::FunctionCallee CGObjCRuntime::GetWillChangeFunction()
+{
+   return( 0);
+}
+
+llvm::FunctionCallee CGObjCRuntime::GetWillReadRelationshipFunction()
+{
+   return( 0);
+}
+
+
+/// Return the runtime function for adding to container properties.
+llvm::FunctionCallee  CGObjCRuntime::GetPropertyContainerAddFunction()
+{
+   return( 0);
+}
+
+/// Return the runtime function for removing from container properties.
+llvm::FunctionCallee  CGObjCRuntime::GetPropertyContainerRemoveFunction()
+{
+   return( 0);
+}
+// @mulle-objc@ new property attributes container, observable <<<

@@ -80,7 +80,10 @@ static bool isCallback(QualType T) {
   // If a parameter is a block or a callback, assume it can modify pointer.
   if (T->isBlockPointerType() ||
       T->isFunctionPointerType() ||
-      T->isObjCSelType())
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+      T->isObjCSelType() ||
+      T->isObjCProtocolType())
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
     return true;
 
   // Check if a callback is passed inside a struct (for both, struct passed by

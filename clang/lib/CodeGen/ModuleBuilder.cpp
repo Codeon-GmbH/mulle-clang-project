@@ -35,8 +35,12 @@ namespace {
     ASTContext *Ctx;
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS; // Only used for debug info.
     const HeaderSearchOptions &HeaderSearchOpts; // Only used for debug info.
+// @mulle-objc@ need PreprocessorOptions public >
+  public:
     const PreprocessorOptions &PreprocessorOpts; // Only used for debug info.
-    const CodeGenOptions &CodeGenOpts;
+// @mulle-objc@ need PreprocessorOptions public <
+  private:
+    const CodeGenOptions CodeGenOpts;  // Intentionally copied in.
 
     unsigned HandlingTopLevelDecls;
 
@@ -313,6 +317,12 @@ namespace {
     void CompleteExternalDeclaration(VarDecl *D) override {
       Builder->EmitExternalDeclaration(D);
     }
+
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished >
+    void ParserDidFinish( Parser *P) override {
+       CGM().ParserDidFinish( P);
+    }
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished <
 
     void HandleVTable(CXXRecordDecl *RD) override {
       if (Diags.hasErrorOccurred())

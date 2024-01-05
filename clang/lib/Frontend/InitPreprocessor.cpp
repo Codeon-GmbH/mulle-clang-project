@@ -27,6 +27,14 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
+
+// @mulle-objc@ universeid hash >
+extern "C"
+{
+   extern uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+}
+// @mulle-objc@ universeid hash <
+
 using namespace clang;
 
 static bool MacroBodyEndsInBackslash(StringRef MacroBody) {
@@ -863,6 +871,35 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
             "__OBJC_GNUSTEP_RUNTIME_ABI__",
             "1" + Twine(std::min(8U, version.getMinor().value_or(0))));
     }
+
+    // @mulle-objc@ language: announce that we are running >
+    if (LangOpts.ObjCRuntime.hasMulleMetaABI())
+    {
+       //       Builder.defineMacro("__MULLE_METAABI__");  // superflous
+       Builder.defineMacro("__MULLE_OBJC__");
+       Builder.defineMacro( LangOpts.ObjCAllocsAutoreleasedObjects ? "__MULLE_OBJC_AAM__" : "__MULLE_OBJC_NO_AAM__");
+       Builder.defineMacro( LangOpts.ObjCDisableFastCalls ? "__MULLE_OBJC_NO_FCS__" : "__MULLE_OBJC_FCS__");
+       Builder.defineMacro( LangOpts.ObjCDisableTaggedPointers ? "__MULLE_OBJC_NO_TPS__" : "__MULLE_OBJC_TPS__");
+
+       if( LangOpts.ObjCUniverseName.length())
+       {
+           std::string   quotedname;
+           char          buf[ 32];
+           uint32_t      hash;
+
+           hash       = MulleObjCUniqueIdHashForString( LangOpts.ObjCUniverseName);
+           sprintf( buf, "0x%lx", (unsigned long) hash);
+           quotedname = std::string( "\"") + LangOpts.ObjCUniverseName +  std::string( "\"");
+           Builder.defineMacro( "__MULLE_OBJC_UNIVERSENAME__", quotedname.c_str());
+           Builder.defineMacro( "__MULLE_OBJC_UNIVERSEID__", buf);
+       }
+       else
+       {
+           Builder.defineMacro( "__MULLE_OBJC_UNIVERSENAME__", "NULL");
+           Builder.defineMacro( "__MULLE_OBJC_UNIVERSEID__", "0");
+       }
+    }
+    // @mulle-objc@ language: announce that we are running <
 
     if (LangOpts.ObjCRuntime.getKind() == ObjCRuntime::ObjFW) {
       VersionTuple tuple = LangOpts.ObjCRuntime.getVersion();

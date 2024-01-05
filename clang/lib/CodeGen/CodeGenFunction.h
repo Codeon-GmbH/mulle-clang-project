@@ -2131,6 +2131,52 @@ public:
                               const ObjCPropertyImplDecl *propImpl,
                               llvm::Constant *AtomicHelperFn);
 
+  // @mulle-objc@ new property attributes container >
+  /// GenerateObjCRemover - Synthesize an Objective-C property setter function
+  /// for the given property.
+  void GenerateObjCAdder(ObjCImplementationDecl *IMP,
+                          const ObjCPropertyImplDecl *PID);
+  void generateObjCAdderBody(const ObjCImplementationDecl *classImpl,
+                              const ObjCPropertyImplDecl *propImpl,
+                              ObjCMethodDecl *method);
+
+  /// GenerateObjCRemover - Synthesize an Objective-C property setter function
+  /// for the given property.
+  void GenerateObjCRemover(ObjCImplementationDecl *IMP,
+                          const ObjCPropertyImplDecl *PID);
+  void generateObjCRemoverBody(const ObjCImplementationDecl *classImpl,
+                              const ObjCPropertyImplDecl *propImpl,
+                              ObjCMethodDecl *method);
+
+  void generateObjCContainerMethodBody(const ObjCImplementationDecl *classImpl,
+                                        const ObjCPropertyImplDecl *propImpl,
+                                        ObjCMethodDecl *method,
+                                        llvm::FunctionCallee propertyFn);
+
+  // @mulle-objc@ new property attributes container <
+
+  // @mulle-objc@ ObjC properties: helper function
+  void emitObjCSetterBodyStatement( ObjCIvarRefExpr &ivarRef, QualType argType, Expr *expr);
+
+  // @mulle-objc@ MetaABI: write/read return values >
+
+  llvm::Value      *GetMetaABIParamAddressLValue( const Decl *FuncDecl);
+
+  void             EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl,
+                                                      llvm::Value *ExprResult,
+                                                      QualType ExprType);
+  void             EmitMetaABIWriteAggregateReturnValue( const Decl *FuncDecl,
+                                                         Address ExprResult,
+                                                         Address Param,
+                                                         QualType ExprType);
+  void             EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const Expr *RV);
+  CodeGen::RValue  EmitMetaABIReadReturnValue( const ObjCMethodDecl *Method,
+                                            CodeGen::RValue Rvalue,
+                                            CodeGen::RValue Param,
+                                            ReturnValueSlot Return,
+                                            QualType ResultType);
+  // @mulle-objc@ MetaABI: write/read return values <
+
   //===--------------------------------------------------------------------===//
   //                                  Block Bits
   //===--------------------------------------------------------------------===//

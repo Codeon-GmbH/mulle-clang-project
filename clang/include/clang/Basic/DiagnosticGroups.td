@@ -541,6 +541,9 @@ def OutOfLineDeclaration : DiagGroup<"out-of-line-declaration">;
 def : DiagGroup<"overflow">;
 def ForwardClassReceiver : DiagGroup<"receiver-forward-class">;
 def MethodAccess : DiagGroup<"objc-method-access">;
+// @mulle-objc@ AAMRenaming >
+def AAMRenaming  : DiagGroup<"objc-aam-renaming">;
+// @mulle-objc@ AAMRenaming <
 def ObjCReceiver : DiagGroup<"receiver-expr">;
 def OperatorNewReturnsNull : DiagGroup<"new-returns-null">;
 def OverlengthStrings : DiagGroup<"overlength-strings">;

@@ -807,8 +807,18 @@ void USRGenerator::VisitType(QualType T) {
           Out << 'o'; break;
         case BuiltinType::ObjCClass:
           Out << 'O'; break;
+        /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+        case BuiltinType::ObjCProtocol:
+        /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
         case BuiltinType::ObjCSel:
-          Out << 'e'; break;
+        /// @mulle-objc@ uniqueid: change type of sel and protocol to long >
+          if( Ctx.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          {
+             Out <<  'l'; 
+             break;
+          }
+        /// @mulle-objc@ uniqueid: change type of sel and protocol to long >
+          Out <<  'e'; break;
 #define BUILTIN_TYPE(Id, SingletonId)
 #define PLACEHOLDER_TYPE(Id, SingletonId) case BuiltinType::Id:
 #include "clang/AST/BuiltinTypes.def"
@@ -816,7 +826,7 @@ void USRGenerator::VisitType(QualType T) {
           // If you're adding a new builtin type, please add its name prefixed
           // with "@BT@" to `Out` (see cases above).
           IgnoreResults = true;
-          break;
+          return;
       }
       return;
     }

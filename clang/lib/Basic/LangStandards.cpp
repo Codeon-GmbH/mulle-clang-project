@@ -62,6 +62,12 @@ LangStandard::Kind clang::getDefaultLanguageStandard(clang::Language Lang,
     return LangStandard::lang_gnu17;
   case Language::ObjC:
     return LangStandard::lang_gnu11;
+  // @mulle-objc@ AAM: .aam filename extension support ->
+  case Language::ObjCAAM:
+  // @mulle-objc@ AAM: .aam filename extension support -<
+  // @mulle-objc@ C11 should be standard now -<
+     return LangStandard::lang_c11;
+    // @mulle-objc@ C11 should be standard now -<
   case Language::CXX:
   case Language::ObjCXX:
   case Language::CUDA:

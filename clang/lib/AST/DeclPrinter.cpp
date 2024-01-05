@@ -1573,6 +1573,38 @@ void DeclPrinter::VisitObjCPropertyDecl(ObjCPropertyDecl *PDecl) {
       first = false;
     }
 
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyAttribute::kind_dynamic) {
+      Out << (first ? ' ' : ',') << "dynamic";
+      first = false;
+    }
+
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyAttribute::kind_serializable) {
+      Out << (first ? ' ' : ',') << "serializable";
+      first = false;
+    }
+
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyAttribute::kind_container) {
+      Out << (first ? ' ' : ',') << "container";
+      first = false;
+    }
+
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyAttribute::kind_observable) {
+      Out << (first ? ' ' : ',') << "observable";
+      first = false;
+    }
+
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyAttribute::kind_relationship) {
+      Out << (first ? ' ' : ',') << "relationship";
+      first = false;
+    }
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
+
     if (PDecl->getPropertyAttributes() &
         ObjCPropertyAttribute::kind_nullability) {
       if (auto nullability = AttributedType::stripOuterNullability(T)) {

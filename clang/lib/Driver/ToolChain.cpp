@@ -895,8 +895,9 @@ bool ToolChain::isCrossCompiling() const {
 }
 
 ObjCRuntime ToolChain::getDefaultObjCRuntime(bool isNonFragile) const {
-  return ObjCRuntime(isNonFragile ? ObjCRuntime::GNUstep : ObjCRuntime::GCC,
-                     VersionTuple());
+   // @mulle-objc@ compiler: mulle runtime is default >
+  return ObjCRuntime( ObjCRuntime::Mulle, VersionTuple());
+   // @mulle-objc@ compiler: mulle runtime is default <
 }
 
 llvm::ExceptionHandling

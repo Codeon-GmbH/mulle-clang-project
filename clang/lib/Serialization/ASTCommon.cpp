@@ -210,6 +210,11 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
   case BuiltinType::ObjCSel:
     ID = PREDEF_TYPE_OBJC_SEL;
     break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol:
+    ID = PREDEF_TYPE_OBJC_PROTOCOL;
+    break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   case BuiltinType::Id: \
     ID = PREDEF_TYPE_##Id##_ID; \

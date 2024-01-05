@@ -407,6 +407,10 @@ visit(const ObjCImplementationDecl *ImplD) const {
     }
   }
 
+  // @mulle-objc@ new property attribute container >
+  // MEMO: invalidation check with add/remove is probably impossible
+  // @mulle-objc@ new property attribute container <
+
   // If no ivars need invalidation, there is nothing to check here.
   if (Ivars.empty())
     return;

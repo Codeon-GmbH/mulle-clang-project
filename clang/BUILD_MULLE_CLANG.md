@@ -1,10 +1,10 @@
 # How to build mulle-clang
 
-Executable          | Description
---------------------|--------------------------------
-`mulle-clang`       | The compiler
-`mulle-scan-build`  | The analyzer frontend
-`mulle-nm`          | Symbol lister
+| Executable         | Description
+|--------------------|--------------------------------
+| `mulle-clang`      | The compiler
+| `mulle-scan-build` | The analyzer frontend
+| `mulle-nm`         | Symbol lister
 
 
 ## Prerequisites
@@ -12,9 +12,9 @@ Executable          | Description
 You need a fairly current Unix, like Linux, OS X or FreeBSD or you can use
 Windows.
 
-Locate a place on your filesystem, where you have at least 8 GB disk space free
-after installing all pre-requisites. You probably need not bother to try, if
-you have less than 6 GB of RAM. Or you risk seeing
+Locate a place on your filesystem, where you have at least 10 GB disk space
+free after installing all pre-requisites. You probably need not bother to try,
+if you have less than 12 GB of RAM. Or you risk seeing
 `virtual memory exhausted: Cannot allocate memory`, especially when building
 debug binaries.
 
@@ -42,9 +42,9 @@ Cloning the repository will take forever and just waste space. The instructions
 here might be stale, so check out what's new and current:
 
 ```
-mkdir mulle-clang-140
-cd mulle-clang-140
-curl -L -O "https://github.com/mulle-cc/mulle-clang-project/archive/refs/tags/14.0.6.0.tar.gz"
+mkdir mulle-clang-170
+cd mulle-clang-170
+curl -L -O "https://github.com/mulle-cc/mulle-clang-project/archive/refs/tags/17.0.6.0.tar.gz"
 ```
 
 #### 2. Install prerequisites

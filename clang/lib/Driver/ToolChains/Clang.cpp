@@ -4029,6 +4029,10 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
          CmdArgs.push_back( "-fno-objc-tps");
       if( Args.hasArg( options::OPT_fno_objc_fcs))
          CmdArgs.push_back( "-fno-objc-fcs");
+      if( Args.hasArg( options::OPT_fobjc_tao)) // push both tao flags if there
+         CmdArgs.push_back( "-fobjc-tao");      // default will be handled
+      if( Args.hasArg( options::OPT_fno_objc_tao))
+         CmdArgs.push_back( "-fno-objc-tao");
       if( Args.hasArg( options::OPT_fobjc_aam))
          CmdArgs.push_back( "-fobjc-aam");
       if (const Arg *A =
@@ -4048,6 +4052,7 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
          CmdArgs.push_back( "-fobjc-reuse-param");
       if( Args.hasArg( options::OPT_fno_objc_reuse_param))
          CmdArgs.push_back( "-fno-objc-reuse-param");
+
       Args.ClaimAllArgs(options::OPT_fobjc_tps);
       Args.ClaimAllArgs(options::OPT_fobjc_fcs);
       Args.ClaimAllArgs(options::OPT_fno_objc_aam);

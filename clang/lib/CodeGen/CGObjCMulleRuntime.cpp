@@ -63,7 +63,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  17
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  18
 
 
 using namespace clang;
@@ -747,7 +747,7 @@ namespace {
       PropertyName,
       IvarName,
       IvarType,
-      ProtocolName,
+      ProtocolName
    };
 
 # pragma mark - Actual Runtime Start
@@ -857,8 +857,11 @@ namespace {
       uint32_t      user_version;
       int32_t       no_tagged_pointers;
       int32_t       no_fast_calls;
+      int32_t       thread_affine_objects;
+      int           haveTAOObjectHeader;
       enum INLINE_CALL_LEVEL    inline_calls;
       std::string   universe_name;
+      const char    *origin_name;
       llvm::Constant  *UniverseID;
 
 #define MULLE_OBJC_S_FASTCLASSES   64
@@ -943,6 +946,8 @@ namespace {
 
       /// DefinedNonLazyCategories - List of defined "non-lazy" categories.
       SmallVector<llvm::GlobalValue*, 16> DefinedNonLazyCategories;
+
+      void  DiscoverOriginNameIfMissing( const Decl *D);
 
       /// GetNameForMethod - Return a name for the given method.
       /// \param[out] NameOut - The return value.
@@ -1239,7 +1244,8 @@ namespace {
                                           llvm::Constant *CategoryList,
                                           llvm::Constant *SuperList,
                                           llvm::Constant *StringList,
-                                          llvm::Constant *HashNameList);
+                                          llvm::Constant *HashNameList,
+                                          llvm::Constant *FileName);
        void  HashUniverseName( void);
 
    public:
@@ -1619,11 +1625,19 @@ ObjCTypes(cgm) {
    user_version         = 0;
 
    universe_name        = CGM.getLangOpts().ObjCUniverseName;
+
+   origin_name          = nullptr;
+   DiscoverOriginNameIfMissing( NULL);
+
    HashUniverseName();
 
    // fprintf( stderr, "universe_name: \"%s\"\n", universe_name.c_str());
-   no_tagged_pointers = CGM.getLangOpts().ObjCDisableTaggedPointers;
-   no_fast_calls      = CGM.getLangOpts().ObjCDisableFastCalls;
+   no_tagged_pointers    = CGM.getLangOpts().ObjCDisableTaggedPointers;
+   no_fast_calls         = CGM.getLangOpts().ObjCDisableFastCalls;
+   thread_affine_objects = CGM.getLangOpts().ObjCEnableThreadAffineObjects;
+   haveTAOObjectHeader   = thread_affine_objects; // modify this with some #ifdefs later
+
+   // fprintf( stderr, "Compiler setting (tao=%d)\n", thread_affine_objects);
 
    switch( CGM.getLangOpts().ObjCInlineMethodCalls)
    {
@@ -1991,6 +2005,42 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
          // CGM.getLangOpts().ObjCUniverseName = universe_name;
       }
 
+      // possibly make this a #pragma sometime
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TAO__", &value))
+      {
+         thread_affine_objects = value;
+         if( value)
+            haveTAOObjectHeader = 1;
+         //fprintf( stderr, "#define __MULLE_OBJC_TAO__ encountered (tao=%d)\n", thread_affine_objects);
+      }
+
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TAO__", &value))
+      {
+         thread_affine_objects = ! value;
+         //fprintf( stderr, "#define __MULLE_OBJC_NO_TAO__ encountered (tao=%d)\n", thread_affine_objects);
+
+         // do not change haveTAOObjectHeader though
+      }
+
+      //
+      // so its more convenient for testing, of the TAO header is present
+      // regardless of Release or Debug, since we sometimes mix and match
+      // the actual code to check for that is :
+      // #if defined( __MULLE_OBJC_TAO__) || defined( MULLE_TEST) || defined( MULLE_OBJC_TAO_OBJECT_HEADER)
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_TEST", &value))
+      {
+         if( value)
+            haveTAOObjectHeader = 1;
+         //fprintf( stderr, "#define MULLE_TEST encountered (haveTAOObjectHeader=%d)\n", haveTAOObjectHeader);
+      }
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_TAO_OBJECT_HEADER", &value))
+      {
+         if( value)
+            haveTAOObjectHeader = 1;
+         //fprintf( stderr, "#define MULLE_OBJC_TAO_OBJECT_HEADER encountered (haveTAOObjectHeader=%d)\n", haveTAOObjectHeader);
+      }
+
+
       //
       // this is usually always defined by InitPreprocessor. This code allows
       // redefinition and grabs the universe
@@ -2012,59 +2062,68 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
             HashUniverseName();
          }
       }
-   }
 
-   // optional anyway
-   if( ! foundation_version)
-   {
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MAJOR", &major) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MINOR", &minor) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_PATCH", &patch))
+      // optional anyway
+      if( ! foundation_version)
       {
-         foundation_version = (uint32_t) ((major << 20) | (minor << 8) | patch);
-      }
-   }
-
-   // optional anyway
-   if( ! user_version)
-   {
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MAJOR", &major) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MINOR", &minor) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_PATCH", &patch))
-      {
-         user_version = (uint32_t) ((major << 20) | (minor << 8) | patch);
-      }
-   }
-
-
-   /* this runs for every top level declaration.(layme)
-      Fastclass must always be compiled regardless of optimization level
-    */
-   if( ! fastclassids_defined)
-   {
-      char   buf[ 64];
-
-      for( int i = 0; i < MULLE_OBJC_S_FASTCLASSES; i++)
-      {
-         sprintf( buf, "MULLE_OBJC_FASTCLASSHASH_%d", i);
-         if( GetMacroDefinitionUnsignedIntegerValue( PP, buf, &value))
+         if( GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MAJOR", &major) &&
+             GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MINOR", &minor) &&
+             GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_PATCH", &patch))
          {
-            fastclassids[ i]     = (uint32_t) value; // >> 32;
-            fastclassids_defined = i + 1;
-
-            if( _trace_fastids)
-               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (long long) fastclassids[ i]);
+            foundation_version = (uint32_t) ((major << 20) | (minor << 8) | patch);
          }
       }
-   }
 
-   // not super useful, should be a pragma
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_INLINE_METHOD_CALLS__", &value))
-   {
-      // fprintf( stderr, "__MULLE_OBJC_INLINE_METHOD_CALLS__ %d\n", (int) value);
-      inline_calls = (int) value < 0 ? INLINE_CALL_NONE
-                                     : (value <= INLINE_CALL_FULL ? (enum INLINE_CALL_LEVEL) value
-                                                                  : INLINE_CALL_FULL);
+      // optional anyway
+      if( ! user_version)
+      {
+         if( GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MAJOR", &major) &&
+             GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MINOR", &minor) &&
+             GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_PATCH", &patch))
+         {
+            user_version = (uint32_t) ((major << 20) | (minor << 8) | patch);
+         }
+      }
+
+
+      /* this runs for every top level declaration.(layme)
+         Fastclass must always be compiled regardless of optimization level
+       */
+      if( ! fastclassids_defined)
+      {
+         char   buf[ 64];
+
+         for( int i = 0; i < MULLE_OBJC_S_FASTCLASSES; i++)
+         {
+            sprintf( buf, "MULLE_OBJC_FASTCLASSHASH_%d", i);
+            if( GetMacroDefinitionUnsignedIntegerValue( PP, buf, &value))
+            {
+               fastclassids[ i]     = (uint32_t) value; // >> 32;
+               fastclassids_defined = i + 1;
+
+               if( _trace_fastids)
+                  fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (long long) fastclassids[ i]);
+            }
+         }
+      }
+
+      // not super useful, should be a pragma
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_INLINE_METHOD_CALLS__", &value))
+      {
+         // fprintf( stderr, "__MULLE_OBJC_INLINE_METHOD_CALLS__ %d\n", (int) value);
+         inline_calls = (int) value < 0 ? INLINE_CALL_NONE
+                                        : (value <= INLINE_CALL_FULL ? (enum INLINE_CALL_LEVEL) value
+                                                                     : INLINE_CALL_FULL);
+      }
+
+   // too early or too late, can't do it here ?
+//   if( ! origin_name)
+//   {
+//      ASTContext          *Context = &P->getActions().Context;
+//      TranslationUnitDecl *TUDecl  = Context->getTranslationUnitDecl();
+//      StringRef           s        = Context->getSourceManager().getFilename( TUDecl->getBeginLoc());
+//      fprintf( stderr, "Filename figured out to be \"%s\"\n", s.data());
+//   }
    }
 }
 
@@ -2252,6 +2311,8 @@ llvm::Constant *CGObjCMulleRuntime::GetEHType(QualType T) {
 ///  Generate a constant NSString object.
 //
 // { INTPTR_MAX, NULL, "VfL Bochum 1848", 15 };
+// if we have TAO its
+// { NULL, NULL, INTPTR_MAX, NULL, "VfL Bochum 1848", 15 };
 //
 llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
 {
@@ -2267,20 +2328,28 @@ llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
 
    D->startDefinition();
 
-   QualType FieldTypes[4];
+   QualType FieldTypes[6];
+   unsigned int  n;
+
+   n = 0;
+   if( haveTAOObjectHeader)
+   {
+      FieldTypes[n++] = Context.VoidPtrTy;
+      FieldTypes[n++] = Context.VoidPtrTy;
+   }
 
    // const unsigned long  retainCount;
-   FieldTypes[0] = Context.UnsignedLongTy;
+   FieldTypes[n++] = Context.UnsignedLongTy;
    // const void *isa;
-   FieldTypes[1] = Context.VoidPtrTy;
+   FieldTypes[n++] = Context.VoidPtrTy;
 
    // unsigned char *str;
-   FieldTypes[2] = Context.getPointerType(Context.CharTy.withConst());
+   FieldTypes[n++] = Context.getPointerType(Context.CharTy.withConst());
    // unsigned int length;
-   FieldTypes[3] = Context.UnsignedIntTy;
+   FieldTypes[n++] = Context.UnsignedIntTy;
 
    // Create fields
-   for (unsigned i = 0; i < 4; ++i) {
+   for (unsigned i = 0; i < n; ++i) {
       FieldDecl *Field = FieldDecl::Create(Context, D,
                                            SourceLocation(),
                                            SourceLocation(), nullptr,
@@ -2308,6 +2377,22 @@ llvm::StructType *CGObjCCommonMulleRuntime::GetOrCreateNSConstantStringType( voi
 }
 
 
+void   CGObjCCommonMulleRuntime::DiscoverOriginNameIfMissing( const Decl *D)
+{
+   if( origin_name)
+      return;
+
+   FileID fileID = CGM.getContext().getSourceManager().getMainFileID();
+   std::optional<StringRef> fileName = CGM.getContext().getSourceManager().getNonBuiltinFilenameForID( fileID);
+
+   if( fileName.has_value())
+   {
+      origin_name = (*fileName).data();
+      // fprintf( stderr, "originName set to \"%s\"\n", origin_name);
+   }
+}
+
+
 //
 // this is basically CodeGenModule::GetAddrOfConstantString copy/pasted
 // and slighlty tweaked. Why this code is in CodeGenModule beats me..
@@ -2315,15 +2400,23 @@ llvm::StructType *CGObjCCommonMulleRuntime::GetOrCreateNSConstantStringType( voi
 
 llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRef S, unsigned StringLength)
 {
-   llvm::Constant *Fields[4];
+   llvm::Constant *Fields[6];
+   unsigned int    i;
+
+   i = 0;
+   if( haveTAOObjectHeader)
+   {
+      Fields[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+      Fields[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+   }
 
    // drop LONG_MAX
    llvm::Type *Ty = CGM.getTypes().ConvertType(CGM.getContext().LongTy);
-   Fields[0] = llvm::ConstantInt::get(Ty, LONG_MAX);
+   Fields[i++] = llvm::ConstantInt::get(Ty, LONG_MAX);
 
    // this is filled in by the runtime later
 
-   Fields[1] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+   Fields[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
 
    llvm::GlobalValue::LinkageTypes Linkage = llvm::GlobalValue::PrivateLinkage;
    llvm::Constant *C                       = llvm::ConstantDataArray::getString(VMContext, S);
@@ -2338,11 +2431,11 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
 
    CharUnits Align = CGM.getContext().getTypeAlignInChars(CGM.getContext().CharTy);
    GV->setAlignment( llvm::MaybeAlign( Align.getQuantity()));
-   Fields[2] = getConstantGEP( VMContext, GV, 0, 0);
+   Fields[i++] = getConstantGEP( VMContext, GV, 0, 0);
 
    // String length.
    Ty = CGM.getTypes().ConvertType(CGM.getContext().UnsignedIntTy);
-   Fields[3] = llvm::ConstantInt::get(Ty, StringLength);
+   Fields[i++] = llvm::ConstantInt::get(Ty, StringLength);
 
    llvm::StructType *StructType = GetOrCreateNSConstantStringType();
    return( (llvm::ConstantStruct *) llvm::ConstantStruct::get( StructType, Fields));
@@ -2690,7 +2783,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    GV->setSection( Section);
    GV->setConstant( false);
 
-   llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, 2);
+   llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, haveTAOObjectHeader ? 4 : 2);
 
    //
    // if this is not InternalLinkage I get
@@ -5657,9 +5750,10 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
                                                      llvm::Constant *CategoryList,
                                                      llvm::Constant *SuperList,
                                                      llvm::Constant *StringList,
-                                                     llvm::Constant *HashNameList)
+                                                     llvm::Constant *HashNameList,
+                                                     llvm::Constant *FileName)
 {
-   llvm::Constant   *Values[11];
+   llvm::Constant   *Values[12];
 
    //
    // should get these values from the header
@@ -5680,8 +5774,11 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    bits |= (unsigned int) ((int) this->inline_calls << 4) & 0x70;
    bits |= this->no_fast_calls  ? 0x8 : 0x0;
    bits |= this->no_tagged_pointers ? 0x4 : 0x0;
+   bits |= this->thread_affine_objects ? 0x100 : 0x0;
    bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
    bits |= 0;         // we are sorted, so unsorted == 0
+
+   // fprintf( stderr, "Emit Loadinfo with bits 0x%x (tao=%d)\n", bits, this->thread_affine_objects);
 
    //
    // memorize some compilation context
@@ -5694,6 +5791,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    Values[8] = SuperList;
    Values[9] = StringList;
    Values[10] = HashNameList;
+   Values[11] = FileName;
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
@@ -5717,6 +5815,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    SmallVector<llvm::Constant *, 16> LoadStrings;
    SmallVector<llvm::Constant *, 16> LoadSupers;
    SmallVector<llvm::Constant *, 16> EmitHashes;
+   llvm::Constant   *FileName;
 
    for (auto *I : DefinedClasses)
    {
@@ -5826,13 +5925,21 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       return( nullptr);
    }
 
+   if( CGM.getCodeGenOpts().getDebugInfo() != llvm::codegenoptions::NoDebugInfo)
+   {
+      llvm::GlobalVariable *Entry = CreateCStringLiteral( origin_name, "OBJC_ORIGIN");
+      FileName = getConstantGEP(VMContext, Entry, 0, 0);
+   }
+   else
+      FileName = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
+
   llvm::Constant *Universe     = EmitUniverse( "OBJC_UNIVERSE_LOAD", Section);
   llvm::Constant *ClassList    = EmitClassList( "OBJC_CLASS_LOADS", Section, LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", Section, LoadCategories);
   llvm::Constant *SuperList    = EmitSuperList( "OBJC_SUPER_LOADS", Section, LoadSupers);
   llvm::Constant *StringList   = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", Section, LoadStrings);
   llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", Section, EmitHashes);
-  llvm::Constant *LoadInfo     = EmitLoadInfoList( "OBJC_LOAD_INFO", Section, Universe, ClassList, CategoryList, SuperList, StringList, HashNameList);
+  llvm::Constant *LoadInfo     = EmitLoadInfoList( "OBJC_LOAD_INFO", Section, Universe, ClassList, CategoryList, SuperList, StringList, HashNameList, FileName);
 
    // take collected initializers and create a __attribute__(constructor)
    // static void   __load_mulle_objc() function

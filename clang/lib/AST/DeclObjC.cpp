@@ -1849,6 +1849,7 @@ ObjCInterfaceDecl::getIvarHashString( ASTContext &C) const
       concat = concat + TypeStr;
   }
 
+  // fprintf( stderr, "%s: %s\n", getName().data(), concat.c_str());
   return concat;
 }
 // @mulle-objc@ codegen: make an ivar hash string for fragility fix <

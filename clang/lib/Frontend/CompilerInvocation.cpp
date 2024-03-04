@@ -3343,6 +3343,9 @@ void CompilerInvocation::GenerateLangArgs(const LangOptions &Opts,
     if( Opts.ObjCDisableFastCalls)
          GenerateArg(Args, OPT_fno_objc_fcs, SA);
 
+    if( Opts.ObjCEnableThreadAffineObjects)
+         GenerateArg(Args, OPT_fobjc_tao, SA);
+
     if( Opts.ObjCAllocsAutoreleasedObjects)
          GenerateArg(Args, OPT_fobjc_aam, SA);
 
@@ -3702,11 +3705,27 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
 
-    // @mulle-objc@: handle AAM and TPS options >
+    // @mulle-objc@: handle AAM and TPS an TAO options >
     if( Args.hasArg( OPT_fno_objc_tps))
       Opts.ObjCDisableTaggedPointers = 1;
     if( Args.hasArg( OPT_fno_objc_fcs))
       Opts.ObjCDisableFastCalls = 1;
+
+    // for -O0 TAO is by default ON, otherwise OFF unless
+    // flags are given
+    if( Args.hasArg( OPT_fobjc_tao))
+       Opts.ObjCEnableThreadAffineObjects = 1;
+    else
+      if( Args.hasArg( OPT_fno_objc_tao))
+          Opts.ObjCEnableThreadAffineObjects = 0;
+      else
+      {
+         int optLevel = getOptimizationLevelSize(Args) ? -1 : getOptimizationLevel(Args, IK, Diags);
+         Opts.ObjCEnableThreadAffineObjects = optLevel == 0;
+      }
+
+    if( Args.hasArg( OPT_fobjc_tao))
+      Opts.ObjCEnableThreadAffineObjects = 1;
 
     StringRef value = Args.getLastArgValue(OPT_fobjc_universename_EQ);
     if( value.size() != 0)
@@ -3738,7 +3757,7 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
         value.getAsInteger( 10, x);
        Opts.ObjCInlineMethodCalls = x ? x : 1;
     }
-    // @mulle-objc@: handle AAM and TPS options <
+    // @mulle-objc@: handle AAM and TPS and TAO options <
 
     if (Args.hasArg(OPT_fobjc_gc_only))
       Opts.setGC(LangOptions::GCOnly);

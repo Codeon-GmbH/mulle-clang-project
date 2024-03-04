@@ -2698,6 +2698,10 @@ def fobjc_fcs : Flag<["-"], "fobjc-fcs">, Group<f_Group>, Flags<[CC1Option]>,
    HelpText<"use Objective-C method/class fast calls">;
 def fno_objc_fcs : Flag<["-"], "fno-objc-fcs">, Group<f_Group>, Flags<[CC1Option]>,
    HelpText<"don't use Objective-C fast method/class calls">;
+def fobjc_tao : Flag<["-"], "fobjc-tao">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"use Objective-C thread affine objects">;
+def fno_objc_tao : Flag<["-"], "fno-objc-tao">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"don't use Objective-C thread affine objects">;
 def fobjc_universename_EQ : Joined<["-"], "fobjc-universename=">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"name of the Objective-C universe (enables multiverse), disables tps">;
 def fobjc_aam : Flag<["-"], "fobjc-aam">, Group<f_Group>, Flags<[CC1Option]>,

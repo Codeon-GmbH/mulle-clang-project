@@ -325,6 +325,7 @@ LANGOPT(ObjCAutoRefCount , 1, 0, "Objective-C automated reference counting")
 // @mulle-objc@ options >
 LANGOPT(ObjCDisableTaggedPointers , 1, 0, "Objective-C tagged pointer generation disabled")
 LANGOPT(ObjCDisableFastCalls , 1, 0, "Objective-C fast method/class calls are disabled")
+LANGOPT(ObjCEnableThreadAffineObjects , 1, 0, "Objective-C thread affine objects are enabled")
 LANGOPT(ObjCAllocsAutoreleasedObjects , 1, 0, "Objective-C objects are created autoreleased")
 LANGOPT(ObjCClasscallUseSelf , 2, 0, "Objective-C method code assumes self is valid before [Class call]")
 LANGOPT(ObjCInlineMethodCalls , 3, 0, "Objective-C use inline method call")

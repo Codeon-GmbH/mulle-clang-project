@@ -23,8 +23,8 @@ have been some changes, that affect other runtimes.
 The compiler compiles Objective-C source for the **mulle-objc** runtime by
 default. When compiling for **mulle-objc** the compiler will use the
 [meta-ABI](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_meta_call_convention.html)
-for all method calls. The resultant `.o` files are linkable like any
-other compiled C code.
+for all Objective-C method calls. C function calls use the platform convention.
+The resultant `.o` files are linkable like any other compiled C code.
 
 
 ### AAM - Always Autorelease Mode
@@ -57,26 +57,35 @@ Mode").
 
 ## Additional Compiler options and defined macros
 
-Name                             | Compiler                 | Default | Description
----------------------------------|--------------------------|---------|--------------------
-`__MULLE_OBJC__`                 | -                        | -       | Compiling for mulle-objc
-`__MULLE_OBJC_UNIVERSEID__`      | -fobjc-universename=name | -       | id of the universe, or 0 for default universe
-`__MULLE_OBJC_UNIVERSENAME__`    | -fobjc-universename=name | -       | name of the universe, or NULL for default universe
-
+| Name                             | Compiler                 | Default | Description
+|----------------------------------|--------------------------|---------|--------------------
+| `__MULLE_OBJC__`                 | -                        | -       | Compiling for mulle-objc
+| `__MULLE_OBJC_UNIVERSEID__`      | -fobjc-universename=name | -       | id of the universe, or 0 for default | universe
+| `__MULLE_OBJC_UNIVERSENAME__`    | -fobjc-universename=name | -       | name of the universe, or NULL for default | universe
+| `__OBJC_CLASS__`                 | -                        | -       | name of the class thats currently being compiled
+| `__OBJC_CATEGORY__`              | -                        | -       | name of the category that's currently being compiled
+| `__MULLE_OBJC_CLASSID__`         | -                        | -       | classid of the class thats currently being compiled
+| `__MULLE_OBJC_CATEGORYID__`      | -                        | -       | uniqueud of the category thats currently being compiled
 
 The following table represents option pairs, that logically exclude each other.
 Either one is always defined.
 
-Name                    | Compiler        | Default | Description
-------------------------|-----------------|---------|--------------------
-`__MULLE_OBJC_AAM__`    | .aam file       | -       | AAM is enabled
-`__MULLE_OBJC_NO_AAM__` | .m file         | -       | AAM is not enabled
- &nbsp;                 | &nbsp;          | &nbsp;  |
-`__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES     | TPS (tagged pointer support) is enabled
-`__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO      | TPS is not enabled
-&nbsp;                  | &nbsp;          | &nbsp;  |
-`__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES     | FCS fast method/class support is enabled
-`__MULLE_OBJC_NO_FCS__` | -fno-objc-fcs   | NO      | FCS is not enabled
+| Name                    | Compiler        | Default | Description
+|-------------------------|-----------------|---------|--------------------
+| `__MULLE_OBJC_AAM__`    | .aam file       | -       | AAM is enabled
+| `__MULLE_OBJC_NO_AAM__` | .m file         | -       | AAM is not enabled
+|  &nbsp;                 | &nbsp;          | &nbsp;  |
+| `__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES     | TPS (tagged pointer support) is enabled
+| `__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO      | TPS is not enabled
+| &nbsp;                  | &nbsp;          | &nbsp;  |
+| `__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES     | FCS fast method/class support is enabled
+| `__MULLE_OBJC_NO_FCS__` | -fno-objc-fcs   | NO      | FCS is not enabled
+| &nbsp;                  | &nbsp;          | &nbsp;  |
+| `__MULLE_OBJC_TAO__`    | -fobjc-tao      | -       | TAO (thread affine objects) is enabled
+| `__MULLE_OBJC_NO_TAO__` | -fno-objc-tao   | -       | TAO is not enabled
+
+The default is `-fobjc-tao` for `-O0` builds and `-fno-objc-tao` for optimized
+builds.
 
 
 ## Macros used in Code Generation
@@ -122,7 +131,7 @@ Function                        | Memo
 
 ### Inlining method calls
 
-With `-fobjc-inline-method-calls=[1-4]` you can control the level of inlining.
+With `-fobjc-inline-method-calls=[1-5]` you can control the level of inlining.
 If you don't specify it, the optimization level is mapped to a inlining
 setting. (See table below)
 
@@ -130,13 +139,16 @@ setting. (See table below)
 So full inlining will not be chosen for `-O3`.
 
 
-Inlining         | -fobjc-inline-method-calls | Optimization Level (if -fobjc-inline-method-calls is unset)
------------------|----------------------------|------------------------
-No inlining      | 1                          | -O0
-Minimal inlining | 2                          | -O1
-Partial inlining | 3                          | -O2/-O3
-Full inlining    | 4                          | -O4+
+| Inlining         | -fobjc-inline-method-calls | Optimization Level (if -fobjc-inline-method-calls is unset)
+|------------------|----------------------------|------------------------
+| No inlining      | 1                          | -O0
+| Minimal inlining | 2                          | -O1
+| Partial inlining | 3                          | -O2/-O3
+| Default inlining | 4                          | -O4
+| Full inlining    | 5                          | -O5+
 
+Also note, that if you combine -O0 with -fobjc-inline-method-calls, there
+won't be any inlining, since -O0 prohibits it.
 
 ### No inlining
 
@@ -179,16 +191,36 @@ Function                                                   | Memo
 `mulle_objc_object_release_inline`                         | `[foo release]`
 
 
+The partial inlining code, tries to eliminate some constant setup cost by
+moving it to the compilation. This can be good for multiple calls involving
+the same object.
 
-### Full inlining
 
-Like "Partial inlining", but two functions are replaced with fully inlined
+### Default inlining
+
+Like "Partial inlining", but two functions are replaced with more inlined
 functions:
 
 Function                                            | Memo
 ----------------------------------------------------|-------------
 `mulle_objc_object_call_inline`                     | `[self foo:bar]`
 `mulle_objc_object_supercall_inline`                | `[super foo:bar]`
+
+The default inline code checks the cache for an immediate hit, then slower
+shared coded is used for further cache lookup and cache misses.
+
+### Full inlining
+
+Like "Default inlining", but two functions are replaced with fully inlined
+functions:
+
+Function                                            | Memo
+----------------------------------------------------|-------------
+`mulle_objc_object_call_inline_full`                | `[self foo:bar]`
+`mulle_objc_object_supercall_inline_full`           | `[super foo:bar]`
+
+The full inline code checks the cache for a hit, then slower
+shared coded is used for cache misses.
 
 
 ## Build

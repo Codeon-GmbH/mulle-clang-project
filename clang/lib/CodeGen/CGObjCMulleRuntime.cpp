@@ -87,11 +87,13 @@ namespace {
       uint32_t   runtime_version;
    };
 
+   // MEMO: need to be >= 0 <=7
    enum INLINE_CALL_LEVEL
    {
       INLINE_CALL_NONE,
       INLINE_CALL_MINIMAL,
       INLINE_CALL_PARTIAL,
+      INLINE_CALL_DEFAULT,
       INLINE_CALL_FULL
    };
 
@@ -118,7 +120,8 @@ namespace {
          // be called a lot.
          switch( inline_calls)
          {
-         case INLINE_CALL_FULL     : name = "mulle_objc_object_call_inline"; break;
+         case INLINE_CALL_FULL     : name = "mulle_objc_object_call_inline_full"; break;
+         case INLINE_CALL_DEFAULT  : name = "mulle_objc_object_call_inline"; break;
          case INLINE_CALL_PARTIAL  : name = "mulle_objc_object_call_inline_partial"; break;
          case INLINE_CALL_MINIMAL  : name = "mulle_objc_object_call_inline_minimal"; break;
          default                   : name = "mulle_objc_object_call"; break;
@@ -144,7 +147,8 @@ namespace {
 
          switch( inline_calls)
          {
-         case INLINE_CALL_FULL     : name = "mulle_objc_object_call_inline"; break;
+         case INLINE_CALL_FULL     : name = "mulle_objc_object_call_inline_full"; break;
+         case INLINE_CALL_DEFAULT  : name = "mulle_objc_object_call_inline"; break;
          case INLINE_CALL_PARTIAL  : name = "mulle_objc_object_call_inline_partial"; break;
          case INLINE_CALL_MINIMAL  : name = "mulle_objc_object_call_inline_minimal"; break;
          default                   : name = "mulle_objc_object_call"; break;
@@ -209,7 +213,8 @@ namespace {
 
          switch( inline_calls)
          {
-         case INLINE_CALL_FULL     : name = "mulle_objc_object_supercall_inline"; break;
+         case INLINE_CALL_FULL     : name = "mulle_objc_object_supercall_inline_full"; break;
+         case INLINE_CALL_DEFAULT  : name = "mulle_objc_object_supercall_inline"; break;
          case INLINE_CALL_PARTIAL  : name = "mulle_objc_object_supercall_inline_partial"; break;
          default                   : name = "mulle_objc_object_supercall"; break;
          }
@@ -1648,13 +1653,15 @@ ObjCTypes(cgm) {
               case 1  : inline_calls = INLINE_CALL_MINIMAL; break;
               case 2  :
               case 3  : inline_calls = INLINE_CALL_PARTIAL; break;
-              default : inline_calls = INLINE_CALL_FULL; break;
+              default : inline_calls = INLINE_CALL_DEFAULT; break;
+              case 5  : inline_calls = INLINE_CALL_FULL; break;
               }
               break;
    case 1  :  inline_calls = INLINE_CALL_NONE; break;
    case 2  :  inline_calls = INLINE_CALL_MINIMAL; break;
    case 3  :  inline_calls = INLINE_CALL_PARTIAL; break;
-   default :  inline_calls = INLINE_CALL_FULL;
+   default :  inline_calls = INLINE_CALL_DEFAULT; break;
+   case 5  :  inline_calls = INLINE_CALL_FULL; break;
    }
 
 //   fprintf( stderr, "OptimizationLevel=%d\n", CGM.getCodeGenOpts().OptimizationLevel);
@@ -2135,6 +2142,7 @@ static const char   *getObjectNoFCSLookupClassFunctionName( enum INLINE_CALL_LEV
    switch( inline_calls)
    {
    case INLINE_CALL_FULL    :
+   case INLINE_CALL_DEFAULT :
    case INLINE_CALL_PARTIAL :
              return( "mulle_objc_object_lookup_infraclass_inline_nofail_nofast");
    default : return( "mulle_objc_object_lookup_infraclass_nofail_nofast");
@@ -2146,6 +2154,7 @@ static const char   *getObjectFCSLookupClassFunctionName( enum INLINE_CALL_LEVEL
    switch( inline_calls)
    {
    case INLINE_CALL_FULL    :
+   case INLINE_CALL_DEFAULT :
    case INLINE_CALL_PARTIAL :
              return( "mulle_objc_object_lookup_infraclass_inline_nofail");
    default : return( "mulle_objc_object_lookup_infraclass_nofail");
@@ -2160,8 +2169,8 @@ static const char   *getRuntimeNoFCSLookupClassFunctionName( enum INLINE_CALL_LE
    switch( inline_calls)
    {
    case INLINE_CALL_FULL    :
+   case INLINE_CALL_DEFAULT :
    case INLINE_CALL_PARTIAL :
-
              return( "mulle_objc_global_lookup_infraclass_inline_nofail_nofast");
    default : return( "mulle_objc_global_lookup_infraclass_nofail_nofast");
    }
@@ -2172,6 +2181,7 @@ static const char   *getRuntimeFCSLookupClassFunctionName( enum INLINE_CALL_LEVE
    switch( inline_calls)
    {
    case INLINE_CALL_FULL    :
+   case INLINE_CALL_DEFAULT :
    case INLINE_CALL_PARTIAL :
              return( "mulle_objc_global_lookup_infraclass_inline_nofail");
    default : return( "mulle_objc_global_lookup_infraclass_nofail");
@@ -2400,23 +2410,29 @@ void   CGObjCCommonMulleRuntime::DiscoverOriginNameIfMissing( const Decl *D)
 
 llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRef S, unsigned StringLength)
 {
-   llvm::Constant *Fields[6];
+   llvm::Constant *Fields6[6];
+   llvm::Constant *Fields4[4]; //because of some retard code down in llvm
    unsigned int    i;
+   unsigned int    j;
 
    i = 0;
    if( haveTAOObjectHeader)
    {
-      Fields[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
-      Fields[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+      Fields6[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+      Fields6[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
    }
 
+   j = 0;
    // drop LONG_MAX
    llvm::Type *Ty = CGM.getTypes().ConvertType(CGM.getContext().LongTy);
-   Fields[i++] = llvm::ConstantInt::get(Ty, LONG_MAX);
+
+   Fields6[i] = llvm::ConstantInt::get(Ty, LONG_MAX);
+   Fields4[j++] = Fields6[i++];
 
    // this is filled in by the runtime later
 
-   Fields[i++] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+   Fields6[i] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+   Fields4[j++] = Fields6[i++];
 
    llvm::GlobalValue::LinkageTypes Linkage = llvm::GlobalValue::PrivateLinkage;
    llvm::Constant *C                       = llvm::ConstantDataArray::getString(VMContext, S);
@@ -2431,14 +2447,19 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
 
    CharUnits Align = CGM.getContext().getTypeAlignInChars(CGM.getContext().CharTy);
    GV->setAlignment( llvm::MaybeAlign( Align.getQuantity()));
-   Fields[i++] = getConstantGEP( VMContext, GV, 0, 0);
+   Fields6[i]   = getConstantGEP( VMContext, GV, 0, 0);
+   Fields4[j++] = Fields6[i++];
 
    // String length.
    Ty = CGM.getTypes().ConvertType(CGM.getContext().UnsignedIntTy);
-   Fields[i++] = llvm::ConstantInt::get(Ty, StringLength);
+   Fields6[i]   = llvm::ConstantInt::get(Ty, StringLength);
+   Fields4[j++] = Fields6[i++];
 
    llvm::StructType *StructType = GetOrCreateNSConstantStringType();
-   return( (llvm::ConstantStruct *) llvm::ConstantStruct::get( StructType, Fields));
+   if( haveTAOObjectHeader)
+      return( (llvm::ConstantStruct *) llvm::ConstantStruct::get( StructType, Fields6));
+   else
+      return( (llvm::ConstantStruct *) llvm::ConstantStruct::get( StructType, Fields4));
 }
 
 

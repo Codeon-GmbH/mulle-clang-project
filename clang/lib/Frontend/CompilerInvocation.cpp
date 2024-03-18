@@ -3748,10 +3748,10 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if( Args.hasArg( OPT_fno_objc_reuse_param))
       Opts.ObjCReuseParam = 2;
 
-    // 0 is unset, 1:none, 2: minimal, 3: partial, 4:full
+    // 0 is unset, 1:none, 2: minimal, 3: partial, 4:default 5:full
     if( Args.hasArg( OPT_fobjc_inline_method_calls))
     {
-       int   x = 4; // default if set (else why set ?)
+       int   x = 4; // default if set
        StringRef value = Args.getLastArgValue(OPT_fobjc_inline_method_calls);
        if( value.size() != 0)
         value.getAsInteger( 10, x);

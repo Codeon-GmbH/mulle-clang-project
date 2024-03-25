@@ -687,10 +687,14 @@ ObjCMethodFamily Selector::getMethodFamilyImpl(Selector sel) {
   while (!name.empty() && name.front() == '_')
     name = name.substr(1);
 
-  // @mulle-objc@ remove "mulle" prefix for method familiy detection >
+  // @mulle-objc@ remove "mulle" prefix for method family detection >
   if (startsWithWord(name, "mulle"))
-     name = name.substr(5);
-  // @mulle-objc@ remove "mulle" prefix for method familiy detection <
+  {
+    SmallString<64> cutName( name.substr( 5));
+    cutName[0] = toLowercase(cutName[0]);
+    name       = cutName.substr(5);
+  }
+  // @mulle-objc@ remove "mulle" prefix for method family detection <
 
   if (name.empty()) return OMF_None;
   switch (name.front()) {
@@ -723,6 +727,16 @@ ObjCInstanceTypeFamily Selector::getInstTypeMethodFamily(Selector sel) {
   StringRef name = first->getName();
 
   if (name.empty()) return OIT_None;
+
+  // @mulle-objc@ remove "mulle" prefix for method family detection >
+  if (startsWithWord(name, "mulle"))
+  {
+    SmallString<64> cutName( name.substr( 5));
+    cutName[0] = toLowercase(cutName[0]);
+    name       = cutName.substr(5);
+  }
+  // @mulle-objc@ remove "mulle" prefix for method family detection <
+
   switch (name.front()) {
     case 'a':
       if (startsWithWord(name, "array")) return OIT_Array;
@@ -749,6 +763,15 @@ ObjCStringFormatFamily Selector::getStringFormatFamilyImpl(Selector sel) {
   if (!first) return SFF_None;
 
   StringRef name = first->getName();
+
+  // @mulle-objc@ remove "mulle" prefix for method family detection >
+  if (startsWithWord(name, "mulle"))
+  {
+    SmallString<64> cutName( name.substr( 5));
+    cutName[0] = toLowercase(cutName[0]);
+    name       = cutName.substr(5);
+  }
+  // @mulle-objc@ remove "mulle" prefix for method family detection <
 
   switch (name.front()) {
     case 'a':
@@ -784,8 +807,19 @@ static SelectorTableImpl &getSelectorTableImpl(void *P) {
   return *static_cast<SelectorTableImpl*>(P);
 }
 
+
 SmallString<64>
 SelectorTable::constructSetterName(StringRef Name) {
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: >
+  if( startsWithWord( Name, "mulle"))
+  {
+    SmallString<64> SetterName("mulleSet");
+    SetterName += Name.substr( 5);
+    SetterName[8] = toUppercase(SetterName[8]);
+    return SetterName;
+  }
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: <
+
   SmallString<64> SetterName("set");
   SetterName += Name;
   SetterName[3] = toUppercase(SetterName[3]);
@@ -803,6 +837,13 @@ SelectorTable::constructSetterSelector(IdentifierTable &Idents,
 
 std::string SelectorTable::getPropertyNameFromSetterSelector(Selector Sel) {
   StringRef Name = Sel.getNameForSlot(0);
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: >
+  if( startsWithWord( Name, "mulleSet"))
+  {
+    return (Twine(toLowercase(Name[8])) + Name.drop_front(9)).str();
+  }
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: <
+
   assert(Name.startswith("set") && "invalid setter name");
   return (Twine(toLowercase(Name[3])) + Name.drop_front(4)).str();
 }
@@ -811,6 +852,15 @@ std::string SelectorTable::getPropertyNameFromSetterSelector(Selector Sel) {
 // @mulle-objc@ new property attribute container >
 SmallString<64>
 SelectorTable::constructAdderName(StringRef Name) {
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: >
+  if( startsWithWord( Name, "mulle"))
+  {
+    SmallString<64> SetterName("mulleAddTo");
+    SetterName += Name.substr( 5);
+    SetterName[10] = toUppercase(SetterName[10]);
+    return SetterName;
+  }
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: <
   SmallString<64> SetterName("addTo");
   SetterName += Name;
   SetterName[5] = toUppercase(SetterName[5]);
@@ -828,12 +878,28 @@ SelectorTable::constructAdderSelector(IdentifierTable &Idents,
 
 std::string SelectorTable::getPropertyNameFromAdderSelector(Selector Sel) {
   StringRef Name = Sel.getNameForSlot(0);
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: >
+  if( startsWithWord( Name, "mulleAddTo"))
+  {
+    return (Twine(toLowercase(Name[15])) + Name.drop_front(16)).str();
+  }
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: <
+
   assert(Name.startswith("addTo") && "invalid adder name");
   return (Twine(toLowercase(Name[5])) + Name.drop_front(6)).str();
 }
 
 SmallString<64>
 SelectorTable::constructRemoverName(StringRef Name) {
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: >
+  if( startsWithWord( Name, "mulle"))
+  {
+    SmallString<64> SetterName("mulleRemoveFrom");
+    SetterName += Name.substr( 5);
+    SetterName[15] = toUppercase(SetterName[15]);
+    return SetterName;
+  }
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: <
   SmallString<64> SetterName("removeFrom");
   SetterName += Name;
   SetterName[10] = toUppercase(SetterName[10]);
@@ -851,6 +917,12 @@ SelectorTable::constructRemoverSelector(IdentifierTable &Idents,
 
 std::string SelectorTable::getPropertyNameFromRemoverSelector(Selector Sel) {
   StringRef Name = Sel.getNameForSlot(0);
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: >
+  if( startsWithWord( Name, "mulleRemoveFrom"))
+  {
+    return (Twine(toLowercase(Name[15])) + Name.drop_front(16)).str();
+  }
+// @mulle-objc@ setter name mulleFoo, setter = mulleSetFoo: <
   assert(Name.startswith("removeFrom") && "invalid remover name");
   return (Twine(toLowercase(Name[10])) + Name.drop_front(11)).str();
 }

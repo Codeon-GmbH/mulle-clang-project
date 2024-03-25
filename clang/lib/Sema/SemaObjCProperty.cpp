@@ -2660,6 +2660,19 @@ static void AddPropertyAttrs(Sema &S, ObjCMethodDecl *PropertyMethod,
         isa<UnavailableAttr>(A) ||
         isa<AvailabilityAttr>(A))
       PropertyMethod->addAttr(A->clone(S.Context));
+// @mulle-objc@ copy objc_user_ properties over >
+    else
+    {
+      if( auto *AnnotateAttr = dyn_cast<clang::AnnotateAttr>(A))
+      {
+         llvm::StringRef Annotation = AnnotateAttr->getAnnotation();
+         if( Annotation.startswith("objc_user_"))
+         {
+            PropertyMethod->addAttr(A->clone(S.Context));
+         }
+      }
+    }
+// @mulle-objc@ copy user properties over <
   }
 }
 

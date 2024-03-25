@@ -5485,6 +5485,25 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
    // remember if it is markes as the designated initializer
    bits |= MD->hasAttr<ObjCDesignatedInitializerAttr>() ? 0x20 : 0x0;
 
+   // support for
+   // #pragma clang attribute push(__attribute__((annotate("objc_user_0"))), apply_to = objc_method)
+   for( clang::Attr *Attr : MD->getAttrs())
+   {
+      if( auto *AnnotateAttr = dyn_cast<clang::AnnotateAttr>(Attr))
+      {
+         if (AnnotateAttr->getAnnotation() == "objc_user_0")
+            bits |= 0x000800;
+         if (AnnotateAttr->getAnnotation() == "objc_user_1")
+            bits |= 0x001000;
+         if (AnnotateAttr->getAnnotation() == "objc_user_2")
+            bits |= 0x002000;
+         if (AnnotateAttr->getAnnotation() == "objc_user_3")
+            bits |= 0x004000;
+         if (AnnotateAttr->getAnnotation() == "objc_user_4")
+            bits |= 0x008000;
+      }
+   }
+
    //
    // also remember method family (nice for checking if it's init or something)
    // augment with our code
@@ -5512,13 +5531,13 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
          if( MD->getReturnType()->isVoidType() && sel.getNumArgs() == 1)
          {
             IdentifierInfo *first = sel.getIdentifierInfoForSlot(0);
-            if( startsWithWord( first->getName(), "set"))
+            if( startsWithWord( first->getName(), "set") || startsWithWord( first->getName(), "mulleSet"))
                family = 33; // setter
             else
-               if( startsWithWord( first->getName(), "addTo"))
+               if( startsWithWord( first->getName(), "addTo") || startsWithWord( first->getName(), "mulleAddTo"))
                   family = 34; // adder
                else
-                  if( startsWithWord( first->getName(), "removeFrom"))
+                  if( startsWithWord( first->getName(), "removeFrom") || startsWithWord( first->getName(), "mulleRemoveFrom"))
                      family = 35; // remover
          }
       }

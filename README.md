@@ -135,17 +135,18 @@ With `-fobjc-inline-method-calls=[1-5]` you can control the level of inlining.
 If you don't specify it, the optimization level is mapped to a inlining
 setting. (See table below)
 
-`cmake` unfortunately sets `-O3` as the optimization level, for Release builds.
-So full inlining will not be chosen for `-O3`.
+`cmake` sets `-O3` as the optimization level, for Release builds, though you
+may want to prefer `-O2` or `-Oz` for Objective-C code.
 
 
 | Inlining         | -fobjc-inline-method-calls | Optimization Level (if -fobjc-inline-method-calls is unset)
 |------------------|----------------------------|------------------------
 | No inlining      | 1                          | -O0
-| Minimal inlining | 2                          | -O1
-| Partial inlining | 3                          | -O2/-O3
-| Default inlining | 4                          | -O4
+| Minimal inlining | 2                          | -O1/-Os
+| Partial inlining | 3                          | -O2/-Oz
+| Default inlining | 4                          | -O3/-O4
 | Full inlining    | 5                          | -O5+
+
 
 Also note, that if you combine -O0 with -fobjc-inline-method-calls, there
 won't be any inlining, since -O0 prohibits it.
@@ -155,7 +156,7 @@ won't be any inlining, since -O0 prohibits it.
 Function                                            | Memo
 ----------------------------------------------------|-------------
 `mulle_objc_object_call`                            | `[self foo:bar]`
-`mulle_objc_object_supercall`                       | `[super foo:bar]`
+`mulle_objc_object_call_super`                       | `[super foo:bar]`
 &nbsp;                                              |
 `mulle_objc_object_lookup_infraclass_nofail`        | `[Foo ...` for methods
 `mulle_objc_object_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
@@ -181,7 +182,7 @@ functions, and two new inlining functions are used:
 Function                                                   | Memo
 -----------------------------------------------------------|-------------
 `mulle_objc_object_call_inline_partial`                    | `[self foo:bar]`
-`mulle_objc_object_supercall_inline_partial`               | `[super foo:bar]`
+`mulle_objc_object_call_super_inline_partial`              | `[super foo:bar]`
 &nbsp;                                                     |
 `mulle_objc_object_lookup_infraclass_inline_nofail`        | `[Foo ...` for methods
 `mulle_objc_global_lookup_infraclass_inline_nofail`        |  `__MULLE_OBJC_NO_FCS__`
@@ -204,7 +205,7 @@ functions:
 Function                                            | Memo
 ----------------------------------------------------|-------------
 `mulle_objc_object_call_inline`                     | `[self foo:bar]`
-`mulle_objc_object_supercall_inline`                | `[super foo:bar]`
+`mulle_objc_object_call_super_inline`               | `[super foo:bar]`
 
 The default inline code checks the cache for an immediate hit, then slower
 shared coded is used for further cache lookup and cache misses.
@@ -217,7 +218,7 @@ functions:
 Function                                            | Memo
 ----------------------------------------------------|-------------
 `mulle_objc_object_call_inline_full`                | `[self foo:bar]`
-`mulle_objc_object_supercall_inline_full`           | `[super foo:bar]`
+`mulle_objc_object_call_super_inline_full`           | `[super foo:bar]`
 
 The full inline code checks the cache for a hit, then slower
 shared coded is used for cache misses.

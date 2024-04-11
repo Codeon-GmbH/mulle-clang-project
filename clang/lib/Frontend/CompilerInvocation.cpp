@@ -3714,18 +3714,22 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // for -O0 TAO is by default ON, otherwise OFF unless
     // flags are given
     if( Args.hasArg( OPT_fobjc_tao))
+    {
        Opts.ObjCEnableThreadAffineObjects = 1;
+       //fprintf( stderr, "-fobjc-tao detected\n");
+    }
     else
       if( Args.hasArg( OPT_fno_objc_tao))
+      {
           Opts.ObjCEnableThreadAffineObjects = 0;
+          //fprintf( stderr, "-fno-objc-tao detected\n");
+      }
       else
       {
          int optLevel = getOptimizationLevelSize(Args) ? -1 : getOptimizationLevel(Args, IK, Diags);
          Opts.ObjCEnableThreadAffineObjects = optLevel == 0;
+         //fprintf( stderr, "Use optLevel %d\n", optLevel);
       }
-
-    if( Args.hasArg( OPT_fobjc_tao))
-      Opts.ObjCEnableThreadAffineObjects = 1;
 
     StringRef value = Args.getLastArgValue(OPT_fobjc_universename_EQ);
     if( value.size() != 0)

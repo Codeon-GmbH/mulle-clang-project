@@ -202,7 +202,7 @@ namespace {
                                           "mulle_objc_object_zone");
       }
 
-      /// id mulle_objc_object_supercall (id, SEL, void *, SUPERID)
+      /// id mulle_objc_object_call_super (id, SEL, void *, SUPERID)
       ///
       /// The messenger used for super calls from instance methods
       /// and class methods too
@@ -213,10 +213,10 @@ namespace {
 
          switch( inline_calls)
          {
-         case INLINE_CALL_FULL     : name = "mulle_objc_object_supercall_inline_full"; break;
-         case INLINE_CALL_DEFAULT  : name = "mulle_objc_object_supercall_inline"; break;
-         case INLINE_CALL_PARTIAL  : name = "mulle_objc_object_supercall_inline_partial"; break;
-         default                   : name = "mulle_objc_object_supercall"; break;
+         case INLINE_CALL_FULL     : name = "mulle_objc_object_call_super_inline_full"; break;
+         case INLINE_CALL_DEFAULT  : name = "mulle_objc_object_call_super_inline"; break;
+         case INLINE_CALL_PARTIAL  : name = "mulle_objc_object_call_super_inline_partial"; break;
+         default                   : name = "mulle_objc_object_call_super"; break;
          }
 
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, SuperIDTy  };
@@ -1646,22 +1646,24 @@ ObjCTypes(cgm) {
 
    switch( CGM.getLangOpts().ObjCInlineMethodCalls)
    {
-   case 0  :  switch( CGM.getLangOpts().OptimizeSize ? -1 : (int) CGM.getCodeGenOpts().OptimizationLevel)
+   case 0  :  switch( CGM.getLangOpts().OptimizeSize ? -CGM.getLangOpts().OptimizeSize
+                                                     : (int) CGM.getCodeGenOpts().OptimizationLevel)
               {
-              case -1 : inline_calls = INLINE_CALL_MINIMAL; break;
+              case -2 : inline_calls = INLINE_CALL_PARTIAL; break;  // Oz
+              case -1 : inline_calls = INLINE_CALL_MINIMAL; break;  // Os
               case 0  : inline_calls = INLINE_CALL_NONE; break;
               case 1  : inline_calls = INLINE_CALL_MINIMAL; break;
-              case 2  :
-              case 3  : inline_calls = INLINE_CALL_PARTIAL; break;
-              default : inline_calls = INLINE_CALL_DEFAULT; break;
-              case 5  : inline_calls = INLINE_CALL_FULL; break;
+              case 2  : inline_calls = INLINE_CALL_PARTIAL; break;
+              case 3  :
+              case 4  : inline_calls = INLINE_CALL_DEFAULT; break;
+              default : inline_calls = INLINE_CALL_FULL; break;
               }
               break;
    case 1  :  inline_calls = INLINE_CALL_NONE; break;
    case 2  :  inline_calls = INLINE_CALL_MINIMAL; break;
    case 3  :  inline_calls = INLINE_CALL_PARTIAL; break;
-   default :  inline_calls = INLINE_CALL_DEFAULT; break;
-   case 5  :  inline_calls = INLINE_CALL_FULL; break;
+   case 4  :  inline_calls = INLINE_CALL_DEFAULT; break;
+   default :  inline_calls = INLINE_CALL_FULL; break;
    }
 
 //   fprintf( stderr, "OptimizationLevel=%d\n", CGM.getCodeGenOpts().OptimizationLevel);
@@ -2018,13 +2020,13 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
          thread_affine_objects = value;
          if( value)
             haveTAOObjectHeader = 1;
-         //fprintf( stderr, "#define __MULLE_OBJC_TAO__ encountered (tao=%d)\n", thread_affine_objects);
+         // fprintf( stderr, "#define __MULLE_OBJC_TAO__ encountered (tao=%d)\n", thread_affine_objects);
       }
 
       if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TAO__", &value))
       {
          thread_affine_objects = ! value;
-         //fprintf( stderr, "#define __MULLE_OBJC_NO_TAO__ encountered (tao=%d)\n", thread_affine_objects);
+         // fprintf( stderr, "#define __MULLE_OBJC_NO_TAO__ encountered (tao=%d)\n", thread_affine_objects);
 
          // do not change haveTAOObjectHeader though
       }
@@ -2928,12 +2930,10 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
 
    if( ! nArgs)
    {
-      int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
-
+       //
+      // use shortcuts when optimizing O2 and up (also when optimizing for size)
       //
-      // use shortcuts when optimizing O2 and up
-      //
-      if( optLevel >= 2)
+      if( inline_calls >= INLINE_CALL_PARTIAL)
       {
          selName = Sel.getAsString();
          do
@@ -5803,20 +5803,22 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, this->foundation_version);  // foundation
    Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, this->user_version);        // user
 
-   unsigned int   optLevel;
+   int  optLevel;
 
-   optLevel  = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
-   optLevel &= 0x7;
+   optLevel = CGM.getLangOpts().OptimizeSize ? -CGM.getLangOpts().OptimizeSize
+                                             : CGM.getCodeGenOpts().OptimizationLevel;
+   optLevel &= 0xF;
 
    unsigned int   bits;
 
-   bits  = optLevel << 8;
-   bits |= (unsigned int) ((int) this->inline_calls << 4) & 0x70;
-   bits |= this->no_fast_calls  ? 0x8 : 0x0;
-   bits |= this->no_tagged_pointers ? 0x4 : 0x0;
-   bits |= this->thread_affine_objects ? 0x100 : 0x0;
+   bits  = 0;         // we are sorted, so unsorted (0x1) == 0
    bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
-   bits |= 0;         // we are sorted, so unsorted == 0
+   bits |= this->no_tagged_pointers ? 0x4 : 0x0;
+   bits |= this->no_fast_calls  ? 0x8 : 0x0;
+   bits |= this->thread_affine_objects ? 0x10 : 0x0;
+
+   bits |= optLevel << 8;
+   bits |= ((unsigned int) this->inline_calls & 0x7) << 12;
 
    // fprintf( stderr, "Emit Loadinfo with bits 0x%x (tao=%d)\n", bits, this->thread_affine_objects);
 

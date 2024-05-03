@@ -2428,7 +2428,8 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
    // drop LONG_MAX
    llvm::Type *Ty = CGM.getTypes().ConvertType(CGM.getContext().LongTy);
 
-   Fields6[i] = llvm::ConstantInt::get(Ty, LONG_MAX);
+   // #define MULLE_OBJC_NEVER_RELEASE  (INTPTR_MAX-1)
+   Fields6[i] = llvm::ConstantInt::get(Ty, INTPTR_MAX-1);
    Fields4[j++] = Fields6[i++];
 
    // this is filled in by the runtime later
@@ -2718,20 +2719,20 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
          uint32_t   value;
 
          value = 0;
-         if( mulle_char7_is32bit( const_cast< char *>( str.data()), StringLength))
-         {
-            value = mulle_char7_encode32_ascii( const_cast< char *>( str.data()), StringLength);
-            value <<= 2;
-            value |= 0x3;
-         }
-         else
+//         if( mulle_char7_is32bit( const_cast< char *>( str.data()), StringLength))
+//         {
+//            value = mulle_char7_encode32_ascii( const_cast< char *>( str.data()), StringLength);
+//            value <<= 2;
+//            value  |= 0x4;
+//         }
+//         else
             if( mulle_char5_is32bit( const_cast< char *>( str.data()), StringLength))
             {
                value = mulle_char5_encode32_ascii( const_cast< char *>( str.data()), StringLength);
 
                // shift up and tag as string
                value <<= 2;
-               value |= 0x1;
+               value  |= 0x1;
             }
 
          if( value)
@@ -2753,7 +2754,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
          {
             value = mulle_char7_encode64_ascii( const_cast< char *>( str.data()), StringLength);
             value <<= 3;
-            value |= 0x3;
+            value  |= 0x4;
          }
          else
             if( mulle_char5_is64bit( const_cast< char *>( str.data()), StringLength))
@@ -2762,7 +2763,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
 
                // shift up and tag as string
                value <<= 3;
-               value |= 0x1;
+               value  |= 0x1;
             }
 
          if( value)
@@ -4171,10 +4172,10 @@ QualType   CGObjCMulleRuntime::CreateVoid5PtrTy( void)
 
    // construct  void  *[5];
    return( CGM.getContext().getConstantArrayType( CGM.getContext().VoidPtrTy,
-                                                 units,
-                                                 nullptr,
-                                                 ArrayType::Normal,
-                                                 0));
+                                                  units,
+                                                  nullptr,
+                                                  ArrayType::Normal,
+                                                  0));
 }
 
 
@@ -4894,9 +4895,9 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
                                  : zeroSel;
    setterSel = (! setter.isNull() && ! PD->isReadOnly())  ? _HashConstantForString( setter.getAsString())
                                                           : zeroSel;
-   adderSel  = (! adder.isNull() && ! PD->isReadOnly() && (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_relationship))  ? _HashConstantForString( adder.getAsString())
+   adderSel  = (! adder.isNull() && ! PD->isReadOnly() && (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_container))  ? _HashConstantForString( adder.getAsString())
                                                          : zeroSel;
-   removerSel= (! remover.isNull() && ! PD->isReadOnly() && (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_relationship))  ? _HashConstantForString( remover.getAsString())
+   removerSel= (! remover.isNull() && ! PD->isReadOnly() && (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_container))  ? _HashConstantForString( remover.getAsString())
                                                            : zeroSel;
 
    type      = PD->getType();

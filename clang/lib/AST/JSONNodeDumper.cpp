@@ -1140,6 +1140,8 @@ void JSONNodeDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
     attributeOnlyIfTrue("dynamic", Attrs & ObjCPropertyAttribute::kind_dynamic);
     attributeOnlyIfTrue("serializable", Attrs & ObjCPropertyAttribute::kind_serializable);
     attributeOnlyIfTrue("nonserializable", Attrs & ObjCPropertyAttribute::kind_nonserializable);
+    attributeOnlyIfTrue("autorelease", Attrs & ObjCPropertyAttribute::kind_autorelease);
+    attributeOnlyIfTrue("noautorelease", Attrs & ObjCPropertyAttribute::kind_noautorelease);
     attributeOnlyIfTrue("container", Attrs & ObjCPropertyAttribute::kind_container);
     attributeOnlyIfTrue("observable", Attrs & ObjCPropertyAttribute::kind_observable);
     attributeOnlyIfTrue("relationship", Attrs & ObjCPropertyAttribute::kind_relationship);

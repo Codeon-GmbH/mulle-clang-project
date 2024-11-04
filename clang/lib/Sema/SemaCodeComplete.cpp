@@ -7388,6 +7388,10 @@ void Sema::CodeCompleteObjCPropertyFlags(Scope *S, ObjCDeclSpec &ODS) {
     Results.AddResult(CodeCompletionResult("serializable"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCPropertyAttribute::kind_nonserializable))
     Results.AddResult(CodeCompletionResult("nonserializable"));
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCPropertyAttribute::kind_autorelease))
+    Results.AddResult(CodeCompletionResult("autorelease"));
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCPropertyAttribute::kind_noautorelease))
+    Results.AddResult(CodeCompletionResult("noautorelease"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCPropertyAttribute::kind_container))
     Results.AddResult(CodeCompletionResult("container"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCPropertyAttribute::kind_observable))

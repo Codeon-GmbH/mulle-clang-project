@@ -1586,6 +1586,18 @@ void DeclPrinter::VisitObjCPropertyDecl(ObjCPropertyDecl *PDecl) {
       first = false;
     }
 
+//    if (PDecl->getPropertyAttributes() &
+//        ObjCPropertyAttribute::kind_autorelease) {
+//      Out << (first ? ' ' : ',') << "autorelease";
+//      first = false;
+//    }
+
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyAttribute::kind_noautorelease) {
+      Out << (first ? ' ' : ',') << "noautorelease";
+      first = false;
+    }    
+
     if (PDecl->getPropertyAttributes() &
         ObjCPropertyAttribute::kind_container) {
       Out << (first ? ' ' : ',') << "container";

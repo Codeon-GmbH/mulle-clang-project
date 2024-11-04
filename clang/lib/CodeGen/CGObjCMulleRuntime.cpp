@@ -381,7 +381,7 @@ namespace {
          Params.push_back(IdType);
          Params.push_back(SelType);
          Params.push_back(Ctx.getPointerDiffType()->getCanonicalTypeUnqualified());
-         Params.push_back(Ctx.BoolTy);
+         Params.push_back(Ctx.IntTy);
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              IdType, FnInfoOpts::None, Params, FunctionType::ExtInfo(), {},
@@ -400,8 +400,7 @@ namespace {
          Params.push_back(SelType);
          Params.push_back(Ctx.getPointerDiffType()->getCanonicalTypeUnqualified());
          Params.push_back(IdType);
-         Params.push_back(Ctx.BoolTy);
-         Params.push_back(Ctx.BoolTy);
+         Params.push_back(Ctx.IntTy);
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, FnInfoOpts::None, Params, FunctionType::ExtInfo(), {},
@@ -441,7 +440,7 @@ namespace {
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_remove_from_container");
       }
 
-      // this is not really used
+      // this is not really used and the runtime methods do not exist
       llvm::FunctionCallee getOptimizedSetPropertyFn(bool atomic, bool copy) {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();
@@ -4923,6 +4922,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_container)       ? 0x01000 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_relationship)    ? 0x02000 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_observable)      ? 0x04000 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_noautorelease)   ? 0x08000 : 0x0;
 
    if( type->hasPointerRepresentation())
    {

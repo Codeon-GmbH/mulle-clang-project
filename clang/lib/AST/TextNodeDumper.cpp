@@ -2383,6 +2383,10 @@ void TextNodeDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
       OS << " serializable";
     if (Attrs & ObjCPropertyAttribute::kind_nonserializable)
       OS << " nonserializable";
+    if (Attrs & ObjCPropertyAttribute::kind_autorelease)
+      OS << " autorelease";
+    if (Attrs & ObjCPropertyAttribute::kind_noautorelease)
+      OS << " noautorelease";
     if (Attrs & ObjCPropertyAttribute::kind_container)
       OS << " container";
     if (Attrs & ObjCPropertyAttribute::kind_observable)

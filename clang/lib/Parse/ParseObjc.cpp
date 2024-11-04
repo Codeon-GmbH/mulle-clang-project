@@ -952,6 +952,8 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
              II->isStr("dynamic") ||
              II->isStr("serializable") ||
              II->isStr("nonserializable") ||
+             II->isStr("autorelease") ||
+             II->isStr("noautorelease") ||
              II->isStr("container") ||
              II->isStr("relationship") ||
              II->isStr("observable") ||
@@ -995,6 +997,10 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       DS.setPropertyAttributes(ObjCPropertyAttribute::kind_serializable);
     else if (II->isStr("nonserializable"))
       DS.setPropertyAttributes(ObjCPropertyAttribute::kind_nonserializable);
+    else if (II->isStr("autorelease"))
+      DS.setPropertyAttributes(ObjCPropertyAttribute::kind_autorelease);
+    else if (II->isStr("noautorelease"))
+      DS.setPropertyAttributes(ObjCPropertyAttribute::kind_noautorelease);
     else if (II->isStr("container"))
       DS.setPropertyAttributes(ObjCPropertyAttribute::kind_container);
     else if (II->isStr("observable"))

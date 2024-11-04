@@ -32,6 +32,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/InlineAsm.h"
+#include <cstdint>
 #include <optional>
 using namespace clang;
 using namespace CodeGen;
@@ -1288,6 +1289,9 @@ namespace {
     bool hasStrongMember() const { return HasStrong; }
     bool isAtomic() const { return IsAtomic; }
     bool isCopy() const { return IsCopy; }
+    // @mulle-objc@ new property attribute autorelease > 
+    bool isAutorelease() const { return IsAutorelease; }
+    // @mulle-objc@ new property attribute autorelease < 
 
     CharUnits getIvarSize() const { return IvarSize; }
     CharUnits getIvarAlignment() const { return IvarAlignment; }
@@ -1300,7 +1304,9 @@ namespace {
     unsigned IsAtomic : 1;
     unsigned IsCopy : 1;
     unsigned HasStrong : 1;
-
+    // @mulle-objc@ new property attribute autorelease > 
+    unsigned IsAutorelease : 1;
+    // @mulle-objc@ new property attribute autorelease <
     CharUnits IvarSize;
     CharUnits IvarAlignment;
   };
@@ -1314,6 +1320,9 @@ PropertyImplStrategy::PropertyImplStrategy(CodeGenModule &CGM,
 
   IsCopy = (setterKind == ObjCPropertyDecl::Copy);
   IsAtomic = prop->isAtomic();
+  // @mulle-objc@ new property attribute autorelease > 
+  IsAutorelease = prop->isAutorelease();
+  // @mulle-objc@ new property attribute autorelease < 
   HasStrong = false; // doesn't matter here.
 
   // Evaluate the ivar's size and alignment.
@@ -1327,6 +1336,13 @@ PropertyImplStrategy::PropertyImplStrategy(CodeGenModule &CGM,
   // If the property is atomic we need to use getProperty, but in
   // the nonatomic case we can just use expression.
   if (IsCopy) {
+    // @mulle-objc@ new property attribute autorelease > 
+    if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      Kind = (IsAtomic || IsAutorelease) ? GetSetProperty : SetPropertyAndExpressionGet;
+      return;
+    }
+    // @mulle-objc@ new property attribute autorelease < 
     Kind = IsAtomic ? GetSetProperty : SetPropertyAndExpressionGet;
     return;
   }
@@ -1357,6 +1373,13 @@ PropertyImplStrategy::PropertyImplStrategy(CodeGenModule &CGM,
     // the property isn't atomic, we can use normal expression
     // emission for the getter.
     } else if (!IsAtomic) {
+      // @mulle-objc@ new property attribute autorelease > 
+      if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+        Kind = IsAutorelease ? GetSetProperty : SetPropertyAndExpressionGet;
+        return;
+      }
+      // @mulle-objc@ new property attribute autorelease < 
       Kind = SetPropertyAndExpressionGet;
       return;
 
@@ -1665,8 +1688,24 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
     args.add(RValue::get(self), getContext().getObjCIdType());
     args.add(RValue::get(cmd), getContext().getObjCSelType());
     args.add(RValue::get(ivarOffset), getContext().getPointerDiffType());
+    // @mulle-objc@ property setter custom code >
+    // CGMulleRuntime uses different parameters, for the call. Namely not
+    // two bools but an int 
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      uint32_t bits = (strategy.isAtomic() ? 0x2 : 0x0) 
+                  | (strategy.isAutorelease() ? 0x0 : 0x1)
+                  | (strategy.isCopy() ? 0x4 : 0x0);
+      args.add(RValue::get(Builder.getInt32(bits)),
+              getContext().IntTy);      
+    }
+    else {
+    // @mulle-objc@ property setter custom code <
     args.add(RValue::get(Builder.getInt1(strategy.isAtomic())),
              getContext().BoolTy);
+    // @mulle-objc@ property setter custom code >
+    }
+    // @mulle-objc@ property setter custom code <
 
     // FIXME: We shouldn't need to get the function info here, the
     // runtime already should have computed it to build the function.
@@ -2080,10 +2119,27 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
     } else {
       args.add(RValue::get(ivarOffset), getContext().getPointerDiffType());
       args.add(RValue::get(arg), getContext().getObjCIdType());
+      // @mulle-objc@ property setter custom code >
+      // CGMulleRuntime uses different parameters, for the call. Namely not
+      // two bools but an int 
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+        uint32_t bits = (strategy.isAtomic() ? 0x2 : 0x0) 
+                   | (strategy.isAutorelease() ? 0x0 : 0x1)
+                   | (strategy.isCopy() ? 0x4 : 0x0);
+        args.add(RValue::get(Builder.getInt32(bits)),
+                getContext().IntTy);      
+      }
+      else {
+      // @mulle-objc@ property setter custom code <
       args.add(RValue::get(Builder.getInt1(strategy.isAtomic())),
                getContext().BoolTy);
       args.add(RValue::get(Builder.getInt1(strategy.isCopy())),
                getContext().BoolTy);
+      // @mulle-objc@ property setter custom code >
+      }
+      // @mulle-objc@ property setter custom code <
+
       // FIXME: We shouldn't need to get the function info here, the runtime
       // already should have computed it to build the function.
       CGCallee callee = CGCallee::forDirect(setPropertyFn);

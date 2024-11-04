@@ -367,6 +367,10 @@ makePropertyAttributesAsWritten(unsigned Attributes) {
     attributesAsWritten |= ObjCPropertyAttribute::kind_serializable;
   if (Attributes & ObjCPropertyAttribute::kind_nonserializable)
     attributesAsWritten |= ObjCPropertyAttribute::kind_nonserializable;
+  if (Attributes & ObjCPropertyAttribute::kind_autorelease)
+    attributesAsWritten |= ObjCPropertyAttribute::kind_autorelease;
+  if (Attributes & ObjCPropertyAttribute::kind_noautorelease)
+    attributesAsWritten |= ObjCPropertyAttribute::kind_noautorelease;
   if (Attributes & ObjCPropertyAttribute::kind_container)
     attributesAsWritten |= ObjCPropertyAttribute::kind_container;
   if (Attributes & ObjCPropertyAttribute::kind_observable)
@@ -804,6 +808,10 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
     PDecl->setPropertyAttributes(ObjCPropertyAttribute::kind_serializable);
   if (Attributes & ObjCPropertyAttribute::kind_nonserializable)
     PDecl->setPropertyAttributes(ObjCPropertyAttribute::kind_nonserializable);
+  if (Attributes & ObjCPropertyAttribute::kind_autorelease)
+    PDecl->setPropertyAttributes(ObjCPropertyAttribute::kind_autorelease);
+  if (Attributes & ObjCPropertyAttribute::kind_noautorelease)
+    PDecl->setPropertyAttributes(ObjCPropertyAttribute::kind_noautorelease);
   if (Attributes & ObjCPropertyAttribute::kind_container)
     PDecl->setPropertyAttributes(ObjCPropertyAttribute::kind_container);
   if (Attributes & ObjCPropertyAttribute::kind_observable)

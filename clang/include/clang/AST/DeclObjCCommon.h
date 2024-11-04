@@ -49,6 +49,8 @@ enum Kind {
   kind_observable      = 0x200000,
   kind_adder           = 0x400000,
   kind_remover         = 0x800000,
+  kind_autorelease     = 0x1000000,
+  kind_noautorelease   = 0x2000000
   // MEMO: change NumPropertyAttrsBits below when adding
   // @mulle-objc@ new property attributes serializable, container, dynamic <
 
@@ -60,7 +62,7 @@ enum Kind {
 enum {
   /// Number of bits fitting all the property attributes.
   // @mulle-objc@ new property attributes serializable, container, dynamic >
-  NumObjCPropertyAttrsBits = 24
+  NumObjCPropertyAttrsBits = 26
   // @mulle-objc@ new property attributes serializable, container, dynamic <};
 };
 

@@ -917,6 +917,10 @@ public:
   bool isRelationship() const {
     return (PropertyAttributes & ObjCPropertyAttribute::kind_relationship);
   }
+
+  bool isAutorelease() const {
+    return( ! (PropertyAttributes & ObjCPropertyAttribute::kind_noautorelease));
+  }  
   // @mulle-objc@ new property attributes: container, observable, relationship <
 
   bool isInstanceProperty() const { return !isClassProperty(); }

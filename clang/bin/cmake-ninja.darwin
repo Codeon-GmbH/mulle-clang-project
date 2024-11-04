@@ -15,6 +15,7 @@ INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.6.0}${RC}"
 cd build &&
 cmake \
    -DLLVM_BUILD_LLVM_DYLIB='ON' \
+   -DLLVM_BUILD_TESTS="OFF"  \
    -DLLVM_ENABLE_PROJECTS="clang" \
    -DLLVM_ENABLE_RUNTIMES="libcxxabi;libcxx"  \
    -DLLVM_LINK_LLVM_DYLIB=ON \

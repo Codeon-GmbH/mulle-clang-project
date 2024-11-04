@@ -7910,6 +7910,7 @@ ASTContext::getObjCPropertyImplDeclForPropertyDecl(
 /// kPropertyStrong = 'P'            // property GC'able
 /// kPropertyNonAtomic = 'N'         // property non-atomic
 /// kPropertySerializable = 'E'      // property serializable (encodable)
+/// kPropertyNoautorelease = 'U'     // object property does not retain/autorelease
 /// kPropertyContainer = 'K'         // property container (array)
 /// kPropertyGetter = '+',           // followed by adder selector name
 /// kPropertySetter = '-',           // followed by remover selector name
@@ -7966,12 +7967,14 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
     S += ",D";
 
   // @mulle-objc@ new property attributes serializable, container, dynamic >
-  // will only be emitted if non-implicitly declared as seriazable,
+  // will only be emitted if non-implicitly declared as serializable,
   // because we want to do E= in the future
   if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_container)
     S += ",K";
   if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_serializable)
     S += ",E";
+  if( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_noautorelease)
+    S += ",U";
   if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_observable)
     S += ",O";
   if ( PD->getPropertyAttributes() & ObjCPropertyAttribute::kind_relationship)

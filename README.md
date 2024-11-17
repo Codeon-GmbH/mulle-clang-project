@@ -2,7 +2,7 @@
 
 # mulle-clang
 
-This is an Objective-C compiler based on clang 14.0.6, written for the
+This is an Objective-C compiler based on clang 17.0.6, written for the, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
 runtime. It corresponds to mulle-objc-runtime v0.20 or better.
 
@@ -34,12 +34,12 @@ language in the following ways:
 
 1. There is a tranformation done on selector names
 
-    Name           | Transformed Name
-    ---------------|---------------------
-    alloc          | instantiate
-    new            | instantiatedObject
-    copy           | immutableInstance
-    mutableCopy    | mutableInstance
+    | Name          | Transformed Name
+    |---------------|---------------------
+    | `alloc`       | `instantiate`
+    | `new`         | `instantiatedObject`
+    | `copy`        | `immutableInstance`
+    | `mutableCopy` | `mutableInstance`
 2. You can not access instance variables directly, but must use properties (or methods)
 3. You can not do explicit memory management (like `-dealloc`, `-autorelease`,
 `-release`, `-retain`, `-retainCount` etc.)
@@ -97,20 +97,20 @@ are optional, unless indicated otherwise. The runtime, the Objective-C
 Foundation on top of the runtime and the user application, will define them.
 
 
-Name                                  | Description
---------------------------------------|--------------------------------------
-`MULLE_OBJC_RUNTIME_VERSION_MAJOR`    | Major of version of the runtime
-`MULLE_OBJC_RUNTIME_VERSION_MINOR`    | Minor of version of the runtime
-`MULLE_OBJC_RUNTIME_VERSION_PATCH`    | Patch of version of the runtime
-`MULLE_OBJC_FOUNDATION_VERSION_MAJOR` | Major of version of the Foundation
-`MULLE_OBJC_FOUNDATION_VERSION_MINOR` | Minor of version of the Foundation
-`MULLE_OBJC_FOUNDATION_VERSION_PATCH` | Patch of version of the Foundation
-`MULLE_OBJC_USER_VERSION_MAJOR`       | User supplied major of version
-`MULLE_OBJC_USER_VERSION_MINOR`       | User supplied minor of version
-`MULLE_OBJC_USER_VERSION_PATCH`       | User supplied patch of version .All these version information values will be stored in the emitted object file.
-`MULLE_OBJC_FASTCLASSHASH_0`          | First unique ID of a fast class
-... | ...
-`MULLE_OBJC_FASTCLASSHASH_63`         | Last unique ID of a fast class
+| Name                                  | Description
+|---------------------------------------|--------------------------------------
+| `MULLE_OBJC_RUNTIME_VERSION_MAJOR`    | Major of version of the runtime
+| `MULLE_OBJC_RUNTIME_VERSION_MINOR`    | Minor of version of the runtime
+| `MULLE_OBJC_RUNTIME_VERSION_PATCH`    | Patch of version of the runtime
+| `MULLE_OBJC_FOUNDATION_VERSION_MAJOR` | Major of version of the Foundation
+| `MULLE_OBJC_FOUNDATION_VERSION_MINOR` | Minor of version of the Foundation
+| `MULLE_OBJC_FOUNDATION_VERSION_PATCH` | Patch of version of the Foundation
+| `MULLE_OBJC_USER_VERSION_MAJOR`       | User supplied major of version
+| `MULLE_OBJC_USER_VERSION_MINOR`       | User supplied minor of version
+| `MULLE_OBJC_USER_VERSION_PATCH`       | User supplied patch of version. All these version information values will be stored in the emitted object file.
+| `MULLE_OBJC_FASTCLASSHASH_0`          | First unique ID of a fast class
+| ...                                   | ...
+| `MULLE_OBJC_FASTCLASSHASH_63`         | Last unique ID of a fast class
 
 
 ## Functions used in Code Generation
@@ -121,12 +121,13 @@ runtime.
 
 ### All
 
-Function                        | Memo
---------------------------------|---------
-`mulle_objc_exception_tryenter` | `@throw`
-`mulle_objc_exception_tryexit`  | `@finally`
-`mulle_objc_exception_extract`  | `@catch`
-`mulle_objc_exception_match`    | `@catch`
+| Function                        | Memo
+|---------------------------------|---------
+| `mulle_objc_exception_tryenter` | `@throw`
+| `mulle_objc_exception_tryexit`  | `@finally`
+| `mulle_objc_exception_extract`  | `@catch`
+| `mulle_objc_exception_match`    | `@catch`
+
 
 
 ### Inlining method calls
@@ -153,15 +154,15 @@ won't be any inlining, since -O0 prohibits it.
 
 ### No inlining
 
-Function                                            | Memo
-----------------------------------------------------|-------------
-`mulle_objc_object_call`                            | `[self foo:bar]`
-`mulle_objc_object_call_super`                       | `[super foo:bar]`
-&nbsp;                                              |
-`mulle_objc_object_lookup_infraclass_nofail`        | `[Foo ...` for methods
-`mulle_objc_object_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
-`mulle_objc_global_lookup_infraclass_nofail`        | `[Foo ...` for functions
-`mulle_objc_global_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
+| Function                                            | Memo
+|-----------------------------------------------------|-------------
+| `mulle_objc_object_call`                            | `[self foo:bar]`
+| `mulle_objc_object_supercall`                       | `[super foo:bar]`
+| &nbsp;                                              |
+| `mulle_objc_object_lookup_infraclass_nofail`        | `[Foo ...` for methods
+| `mulle_objc_object_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
+| `mulle_objc_global_lookup_infraclass_nofail`        | `[Foo ...` for functions
+| `mulle_objc_global_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
 
 
 ### Minimal inlining
@@ -169,9 +170,9 @@ Function                                            | Memo
 Like "No inlining" but one function is replaced with a minimally inlining
 version:
 
-Function                                            | Memo
-----------------------------------------------------|-------------
-`mulle_objc_object_call_inline_minimal`             | `[self foo:bar]`
+| Function                                            | Memo
+|-----------------------------------------------------|-------------
+| `mulle_objc_object_call_inline_minimal`             | `[self foo:bar]`
 
 
 ### Partial inlining
@@ -179,17 +180,17 @@ Function                                            | Memo
 Like "No inlining" but four functions are replaced with four inlining
 functions, and two new inlining functions are used:
 
-Function                                                   | Memo
------------------------------------------------------------|-------------
-`mulle_objc_object_call_inline_partial`                    | `[self foo:bar]`
-`mulle_objc_object_call_super_inline_partial`              | `[super foo:bar]`
-&nbsp;                                                     |
-`mulle_objc_object_lookup_infraclass_inline_nofail`        | `[Foo ...` for methods
-`mulle_objc_global_lookup_infraclass_inline_nofail`        |  `__MULLE_OBJC_NO_FCS__`
-`mulle_objc_object_lookup_infraclass_inline_nofail_nofast` | `[Foo ...` for functions
-`mulle_objc_global_lookup_infraclass_inline_nofail_nofast` | `__MULLE_OBJC_NO_FCS__`
-`mulle_objc_object_retain_inline`                          | `[foo retain]`
-`mulle_objc_object_release_inline`                         | `[foo release]`
+| Function                                                   | Memo
+|------------------------------------------------------------|-------------
+| `mulle_objc_object_call_inline_partial`                    | `[self foo:bar]`
+| `mulle_objc_object_supercall_inline_partial`               | `[super foo:bar]`
+| &nbsp;                                                     |
+| `mulle_objc_object_lookup_infraclass_inline_nofail`        | `[Foo ...` for methods
+| `mulle_objc_global_lookup_infraclass_inline_nofail`        |  `__MULLE_OBJC_NO_FCS__`
+| `mulle_objc_object_lookup_infraclass_inline_nofail_nofast` | `[Foo ...` for functions
+| `mulle_objc_global_lookup_infraclass_inline_nofail_nofast` | `__MULLE_OBJC_NO_FCS__`
+| `mulle_objc_object_retain_inline`                          | `[foo retain]`
+| `mulle_objc_object_release_inline`                         | `[foo release]`
 
 
 The partial inlining code, tries to eliminate some constant setup cost by
@@ -202,10 +203,10 @@ the same object.
 Like "Partial inlining", but two functions are replaced with more inlined
 functions:
 
-Function                                            | Memo
-----------------------------------------------------|-------------
-`mulle_objc_object_call_inline`                     | `[self foo:bar]`
-`mulle_objc_object_call_super_inline`               | `[super foo:bar]`
+| Function                                            | Memo
+|-----------------------------------------------------|-------------
+| `mulle_objc_object_call_inline`                     | `[self foo:bar]`
+| `mulle_objc_object_call_super_inline`               | `[super foo:bar]`
 
 The default inline code checks the cache for an immediate hit, then slower
 shared coded is used for further cache lookup and cache misses.
@@ -215,10 +216,10 @@ shared coded is used for further cache lookup and cache misses.
 Like "Default inlining", but two functions are replaced with fully inlined
 functions:
 
-Function                                            | Memo
-----------------------------------------------------|-------------
-`mulle_objc_object_call_inline_full`                | `[self foo:bar]`
-`mulle_objc_object_call_super_inline_full`           | `[super foo:bar]`
+| Function                                            | Memo
+|-----------------------------------------------------|-------------
+| `mulle_objc_object_call_inline_full`                | `[self foo:bar]`
+| `mulle_objc_object_call_super_inline_full`          | `[super foo:bar]`
 
 The full inline code checks the cache for a hit, then slower
 shared coded is used for cache misses.

@@ -4053,6 +4053,7 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
 
       Args.ClaimAllArgs(options::OPT_fobjc_tps);
       Args.ClaimAllArgs(options::OPT_fobjc_fcs);
+      Args.ClaimAllArgs(options::OPT_fno_objc_tao);
       Args.ClaimAllArgs(options::OPT_fno_objc_aam);
 
       //Args.ClaimAllArgs(options::OPT_fobjc_universename_EQ);

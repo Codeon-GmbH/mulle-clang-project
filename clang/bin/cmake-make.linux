@@ -9,7 +9,7 @@
 # MEMO: If you can't use ninja copy this file and make it cmake-make or so.
 PREFIX="${PREFIX:-/opt}"
 # VERSION / RC are passed in via mulle-clang-cpack
-INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.6.0}${RC}"
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.6.3}${RC}"
 
 r_get_core_count()
 {

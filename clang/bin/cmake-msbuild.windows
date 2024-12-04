@@ -19,7 +19,7 @@
 #
 PREFIX="${PREFIX:-${HOME}}"
 # VERSION / RC are passed in via mulle-clang-cpack
-INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.6.0}${RC}"
+INSTALL_PREFIX="${PREFIX}/mulle-clang-project/${VERSION:-17.0.6.3}${RC}"
 
 if [ ! -d "${INSTALL_PREFIX}" ]
 then

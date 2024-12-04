@@ -688,11 +688,13 @@ ObjCMethodFamily Selector::getMethodFamilyImpl(Selector sel) {
     name = name.substr(1);
 
   // @mulle-objc@ remove "mulle" prefix for method family detection >
-  if (startsWithWord(name, "mulle"))
+  SmallString<64> cutName;
+
+  if( startsWithWord(name, "mulle"))
   {
-    SmallString<64> cutName( name.substr( 5));
+    cutName   += name.substr( 5);   
     cutName[0] = toLowercase(cutName[0]);
-    name       = cutName.substr(5);
+    name       = cutName;
   }
   // @mulle-objc@ remove "mulle" prefix for method family detection <
 
@@ -729,11 +731,13 @@ ObjCInstanceTypeFamily Selector::getInstTypeMethodFamily(Selector sel) {
   if (name.empty()) return OIT_None;
 
   // @mulle-objc@ remove "mulle" prefix for method family detection >
+  SmallString<64> cutName;
+
   if (startsWithWord(name, "mulle"))
   {
-    SmallString<64> cutName( name.substr( 5));
+    cutName   += name.substr( 5);   
     cutName[0] = toLowercase(cutName[0]);
-    name       = cutName.substr(5);
+    name       = cutName;
   }
   // @mulle-objc@ remove "mulle" prefix for method family detection <
 
@@ -765,11 +769,13 @@ ObjCStringFormatFamily Selector::getStringFormatFamilyImpl(Selector sel) {
   StringRef name = first->getName();
 
   // @mulle-objc@ remove "mulle" prefix for method family detection >
+  SmallString<64> cutName;
+
   if (startsWithWord(name, "mulle"))
   {
-    SmallString<64> cutName( name.substr( 5));
+    cutName   += name.substr( 5);   
     cutName[0] = toLowercase(cutName[0]);
-    name       = cutName.substr(5);
+    name       = cutName;
   }
   // @mulle-objc@ remove "mulle" prefix for method family detection <
 
